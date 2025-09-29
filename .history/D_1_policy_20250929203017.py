@@ -511,13 +511,14 @@ class dual_sourcing:
     def TBS_policy(self, sample, demand, mean, x_init=None, q_init=None):
         x_init = self.x_init_DDI if x_init is None else x_init
         q_init = self.q_init if q_init is None else q_init
-        r_range = np.linspace(0,3* mean, self.num_search_range)
+        r_range = np.linspace(0, mean, self.num_search_range)
 
-        TBS_cost_record = []      
-        best_Se_record  = []     
-        feasible_flags  = []    
+        TBS_cost_record = []      # 记录每个 r 的成本
+        best_Se_record  = []      # 对应的 best_Se
+        feasible_flags  = []      # 是否满足服务水平约束
 
         for r in r_range:
+            # 计算 overshoot 记录
             record = self.cal_order_up_to_with_r(sample, self.Se, r,
                                                 x_init, q_init,
                                                 inventory_level=0,
@@ -563,7 +564,7 @@ class dual_sourcing:
             demand, best_Se, best_r,
             x_init, q_init,
             inventory_level=0,
-            constraint_D1=False
+            constraint_D1=True
         )
         return optimal_record
    
@@ -632,10 +633,11 @@ if __name__ == "__main__":
 
 
     lost_sales_result = ds.lost_sales(demand, S=None, inventory_level=0)
+    print(lost_sales_result['order_record'])
     print("\n执行DDI双源策略...")
     ddi_result = ds.DDI_policy(demand, Se=None,D_2_constraint=True,inventory_level=0)
     print(f"DDI双源策略平均总成本: {ddi_result['average_total_cost']}")
-
+    print(ds.cal_fill_rate(sample, ddi_result))
     # print(ddi_result['order_record_regular'])
 
 
@@ -648,7 +650,6 @@ if __name__ == "__main__":
     print('TBS')
     TBS_result=ds.TBS_policy(sample,demand,100,x_init=None,q_init=None)
     print(TBS_result['average_total_cost'])
-
 
 
     # # 调用DI策略

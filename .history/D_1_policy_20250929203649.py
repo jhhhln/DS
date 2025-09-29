@@ -648,7 +648,7 @@ if __name__ == "__main__":
     print('TBS')
     TBS_result=ds.TBS_policy(sample,demand,100,x_init=None,q_init=None)
     print(TBS_result['average_total_cost'])
-
+    print(TBS_result['order_record_r'])
 
 
     # # 调用DI策略

@@ -563,7 +563,7 @@ class dual_sourcing:
             demand, best_Se, best_r,
             x_init, q_init,
             inventory_level=0,
-            constraint_D1=False
+            constraint_D1=True
         )
         return optimal_record
    
@@ -648,7 +648,6 @@ if __name__ == "__main__":
     print('TBS')
     TBS_result=ds.TBS_policy(sample,demand,100,x_init=None,q_init=None)
     print(TBS_result['average_total_cost'])
-
 
 
     # # 调用DI策略

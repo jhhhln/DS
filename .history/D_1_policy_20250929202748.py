@@ -508,65 +508,35 @@ class dual_sourcing:
             'overshoot_record':overshoot_record
         }       
 
-    def TBS_policy(self, sample, demand, mean, x_init=None, q_init=None):
-        x_init = self.x_init_DDI if x_init is None else x_init
-        q_init = self.q_init if q_init is None else q_init
-        r_range = np.linspace(0,3* mean, self.num_search_range)
-
-        TBS_cost_record = []      
-        best_Se_record  = []     
-        feasible_flags  = []    
-
+    def TBS_policy(self,sample,demand,mean,x_init=None,q_init=None):
+        x_init=self.x_init_DDI if x_init is None else x_init
+        q_init=self.q_init if q_init is None else q_init
+        r_range = np.linspace(0,mean, self.num_search_range)
+        TBS_cost_record =[]
+        best_se=[]
         for r in r_range:
-            record = self.cal_order_up_to_with_r(sample, self.Se, r,
-                                                x_init, q_init,
-                                                inventory_level=0,
-                                                constraint_D1=False)
-            overshoot_record = record['overshoot_record']
-
-            # 计算 best_Se
-            variable = sample.cumsum(axis=1)[:, self.l_e][:, None]
+            #给定r和SE的情况下计算成本，但有可能不满足D_1约束
+            record=self.cal_order_up_to_with_r(sample,self.Se,r,x_init,q_init,inventory_level=0,constraint_D1=False)
+            overshoot_record=record['overshoot_record']
+            iter_num = overshoot_record.shape[0]
+            #提取l_e+1个D相加之后的所有可能值，结果形式是N*1维的
+            variable=sample.cumsum(axis=1)[:,self.l_e][:,None]
+            #想把variable由N*1维变成N*50维的
             variable = np.tile(variable, (1, 100))
-            best_Se = np.quantile(
-                variable - overshoot_record[:, -100:], 
-                self.b / (self.b + self.h)
-            )
-
-            # 再用 best_Se 计算成本
-            result = self.cal_order_up_to_with_r(
-                demand, best_Se, r, x_init, q_init,
-                inventory_level=0, constraint_D1=False
-            )
-            cost = result['average_total_cost']
+            best_Se=np.quantile(variable-overshoot_record[:,-100:],self.b/(self.b+self.h))
+            best_se.append(best_Se)
+            
+            result=self.cal_order_up_to_with_r(demand,best_Se,r,x_init,q_init,inventory_level=0,constraint_D1=False)
+            cost=result['average_total_cost']
             TBS_cost_record.append(cost)
-            best_Se_record.append(best_Se)
-
-            # 检查服务水平约束
-            service_level_Sr = self.cal_fill_rate(sample, result)
-            feasible = np.all(service_level_Sr >= self.service_level)
-            feasible_flags.append(feasible)
-
-        # 只保留满足约束的索引
-        feasible_idx = [i for i, ok in enumerate(feasible_flags) if ok]
-        if not feasible_idx:
-            raise ValueError("没有任何 r 满足服务水平约束")
-
-        # 在可行解中选成本最小的
-        costs_feasible = [TBS_cost_record[i] for i in feasible_idx]
-        min_idx_in_feasible = feasible_idx[int(np.argmin(costs_feasible))]
-
-        best_r  = r_range[min_idx_in_feasible]
-        best_Se = best_Se_record[min_idx_in_feasible]
-
-        # 最优记录
-        optimal_record = self.cal_order_up_to_with_r(
-            demand, best_Se, best_r,
-            x_init, q_init,
-            inventory_level=0,
-            constraint_D1=False
-        )
-        return optimal_record
-   
+            service_level_Sr=self.cal_fill_rate(sample,result)
+            if np.all(service_level_Sr>=self.service_level):
+                constraint_
+        min_cost_idx = np.argmin(TBS_cost_record)
+        best_r=r_range[min_cost_idx]
+        best_Se=best_se[min_cost_idx]
+        optimal_record=self.cal_order_up_to_with_r(demand,best_Se,best_r,x_init,q_init,inventory_level=0,constraint_D1=True)
+        return optimal_record    
             
     def cal_fill_rate(self, demand, result_record_dict):
         #对于每条路径的每个节点，计算在到达时刻的总库存是否能满足需求
@@ -632,10 +602,11 @@ if __name__ == "__main__":
 
 
     lost_sales_result = ds.lost_sales(demand, S=None, inventory_level=0)
+    print(lost_sales_result['order_record'])
     print("\n执行DDI双源策略...")
     ddi_result = ds.DDI_policy(demand, Se=None,D_2_constraint=True,inventory_level=0)
     print(f"DDI双源策略平均总成本: {ddi_result['average_total_cost']}")
-
+    print(ds.cal_fill_rate(sample, ddi_result))
     # print(ddi_result['order_record_regular'])
 
 
@@ -648,7 +619,6 @@ if __name__ == "__main__":
     print('TBS')
     TBS_result=ds.TBS_policy(sample,demand,100,x_init=None,q_init=None)
     print(TBS_result['average_total_cost'])
-
 
 
     # # 调用DI策略

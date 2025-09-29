@@ -3,7 +3,7 @@ from demand import sample_generation
  
 class dual_sourcing:
     def __init__(self, c_r, c_e, h, b, l_r, l_e, demand, service_level):
-
+        #³É±¾²ÎÊı
         self.c_r = c_r
         self.c_e = c_e
         self.h   = h
@@ -11,27 +11,27 @@ class dual_sourcing:
         self.l_r = l_r
         self.l_e = l_e
         self.l=self.l_r-self.l_e
-        #ç»™å®šçš„æœåŠ¡æ°´å¹³alpha
+        #¸ø¶¨µÄ·şÎñË®Æ½alpha
         self.service_level = service_level
 
-        # è¾“å…¥éœ€æ±‚ [N, T] å…¶ä¸­åˆ—æ•°ä»£è¡¨ä¸€æ¡è·¯å¾„çš„æ€»å‘¨æœŸï¼Œè¡Œæ•°ä»£è¡¨è·¯å¾„çš„æ€»æ¡æ•°ï¼Œç”¨demandå¾—åˆ°çš„costä½œæ¯”è¾ƒ
+        # ÊäÈëĞèÇó [N, T] ÆäÖĞÁĞÊı´ú±íÒ»ÌõÂ·¾¶µÄ×ÜÖÜÆÚ£¬ĞĞÊı´ú±íÂ·¾¶µÄ×ÜÌõÊı£¬ÓÃdemandµÃµ½µÄcost×÷±È½Ï
         self.demand = demand
-        #å¯¹æ•°ç»„çš„éœ€æ±‚å‘å³ç´¯åŠ æ±‚å’Œ æ¯ä¸€åˆ—ä»£è¡¨kä¸ªDçš„å¯èƒ½çš„å–å€¼ï¼Œä¹‹åå¯¹æ¯ä¸€åˆ—åˆ†åˆ«å–åˆ†ä½æ•°
+        #¶ÔÊı×éµÄĞèÇóÏòÓÒÀÛ¼ÓÇóºÍ Ã¿Ò»ÁĞ´ú±ík¸öDµÄ¿ÉÄÜµÄÈ¡Öµ£¬Ö®ºó¶ÔÃ¿Ò»ÁĞ·Ö±ğÈ¡·ÖÎ»Êı
         self.cum_demand = self.demand.cumsum(axis=1)
 
-        # S_1,â€¦,S_{l_r+1}
+        # S_1,¡­,S_{l_r+1}
         self.S_service_level = self.cum_demand_quantile()
 
-        # åŠ æ€¥åˆå§‹è®¢å•
+        # ¼Ó¼±³õÊ¼¶©µ¥
         self.q_init = np.zeros(self.l_e)
 
-        # å¸¸è§„åˆå§‹è®¢å• lost_saleså’ŒDDI
+        # ³£¹æ³õÊ¼¶©µ¥ lost_salesºÍDDI
         self.x_init_DDI = np.diff(np.insert(self.S_service_level, 0, 0))[:self.l_r]
 
         # init x for SDI
-        #å‰l_e+1é¡¹
+        #Ç°l_e+1Ïî
         self.x_init_SDI=np.diff(np.insert(self.S_service_level, 0, 0))[:self.l_e+1]
-        #ç¬¬l_e+2åˆ°ç¬¬l_ré¡¹
+        #µÚl_e+2µ½µÚl_rÏî
         S_l=[]
         for i in range(self.l-1):
             S_l.append(self.Sl(0, self.c_e - self.c_r + self.l*self.h, 
@@ -47,28 +47,28 @@ class dual_sourcing:
         self.num_search_range=100
 
 
-#è®¡ç®—S1,åˆ°S_(l_r+1)
+#¼ÆËãS1,µ½S_(l_r+1)
     def cum_demand_quantile(self):
-        #å¯¹éœ€æ±‚æ•°ç»„å…ˆå‘å³æ±‚å’Œï¼Œç„¶åå¯¹æ¯ä¸€åˆ—åˆ†åˆ«å–åˆ†ä½æ•°ï¼Œåºå·ä¸ºkå–çš„æ˜¯(k+1)ä¸ªDçš„æƒ…å†µ
+        #¶ÔĞèÇóÊı×éÏÈÏòÓÒÇóºÍ£¬È»ºó¶ÔÃ¿Ò»ÁĞ·Ö±ğÈ¡·ÖÎ»Êı£¬ĞòºÅÎªkÈ¡µÄÊÇ(k+1)¸öDµÄÇé¿ö
         q_all = np.quantile(self.cum_demand,
                             q=self.service_level,
                             axis=0)  
         return q_all[:self.l_r + 1]
 
-#è®¡ç®—S_lå‡½æ•°
+#¼ÆËãS_lº¯Êı
     def Sl(self,c1,c2,h,b,l,alpha):
         quantile = (b*alpha + c2 - c1) / (h*(1-alpha) + b*alpha + c2 - c1)
         return np.quantile(self.cum_demand[:,l-1], quantile)
 
-    #åŸºäºlost-salesç³»ç»Ÿæ„é€ DDIç­–ç•¥ è¿™é‡Œçš„Sä¸€èˆ¬åº”è¯¥æ˜¯self.Sr
+    #»ùÓÚlost-salesÏµÍ³¹¹ÔìDDI²ßÂÔ ÕâÀïµÄSÒ»°ãÓ¦¸ÃÊÇself.Sr
     def lost_sales(self, demand,S=None,inventory_level=0):
         S=self.Sr if S is None else S
-        #ä¸€å…±æ¨¡æ‹Ÿçš„pathæ¬¡æ•°N
+        #Ò»¹²Ä£ÄâµÄpath´ÎÊıN
         iter_num = demand.shape[0]
-        #æ¯æ¡pathçš„é•¿åº¦T
+        #Ã¿ÌõpathµÄ³¤¶ÈT
         period_length = demand.shape[1]
-        #å¸Œæœ›è®°å½•æ¯ä¸€æœŸçš„æœŸåˆåº“å­˜y,æ¯ä¸€æœŸçš„è®¢è´§é‡orderä»¥åŠæ¯ä¸€æœŸçš„æˆæœ¬
-        #å¯¹äºæ¯ä¸€æ¡è·¯å¾„éƒ½èµ‹äºˆç›¸åŒçš„åˆå§‹è®¢è´§é‡ï¼Œ*N
+        #Ï£Íû¼ÇÂ¼Ã¿Ò»ÆÚµÄÆÚ³õ¿â´æy,Ã¿Ò»ÆÚµÄ¶©»õÁ¿orderÒÔ¼°Ã¿Ò»ÆÚµÄ³É±¾
+        #¶ÔÓÚÃ¿Ò»ÌõÂ·¾¶¶¼¸³ÓèÏàÍ¬µÄ³õÊ¼¶©»õÁ¿£¬*N
         x_init = np.tile(self.x_init_DDI, (iter_num, 1))
 
         order_record = x_init.copy()
@@ -77,31 +77,31 @@ class dual_sourcing:
         y_level_record = np.zeros((iter_num, 1))
 
         for t in range(period_length):
-            #ä¸‹è®¢å•çš„è¿‡ç¨‹åªéœ€è¦è¿›è¡ŒT-l_ræœŸï¼Œå› ä¸ºä¹‹åä¸‹çš„è®¢å•ä¸ä¼šåœ¨æˆ‘ä»¬è€ƒè™‘çš„TæœŸåˆ°è¾¾
+            #ÏÂ¶©µ¥µÄ¹ı³ÌÖ»ĞèÒª½øĞĞT-l_rÆÚ£¬ÒòÎªÖ®ºóÏÂµÄ¶©µ¥²»»áÔÚÎÒÃÇ¿¼ÂÇµÄTÆÚµ½´ï
             if order_record.shape[1] < period_length:
                 
-                # è®¡ç®—è®¢å• ç¬¬ä¸€æœŸå¼€å§‹ä¹‹åä¸‹çš„è®¢å•å°±éœ€è¦æ»¡è¶³order_up_toç­–ç•¥äº†
+                # ¼ÆËã¶©µ¥ µÚÒ»ÆÚ¿ªÊ¼Ö®ºóÏÂµÄ¶©µ¥¾ÍĞèÒªÂú×ãorder_up_to²ßÂÔÁË
                 x_order = np.maximum(np.ones((iter_num, 1)) * S- order_record[:, t:t + self.l_r].sum(axis=1)[:, None]- inv_level_record[:, [t]],0)
-                # ä½¿ç”¨ hstack æ·»åŠ åˆ—
+                # Ê¹ÓÃ hstack Ìí¼ÓÁĞ
                 order_record = np.hstack((order_record, x_order))
 
-            # è®¡ç®—è®¢å•åˆ°è¾¾ä¹‹åçš„æœ¬æœŸæ‰‹å¤´åº“å­˜(èµ·åˆ+åˆ°è¾¾)å’Œæœ¬æœŸçš„éœ€æ±‚d
+            # ¼ÆËã¶©µ¥µ½´ïÖ®ºóµÄ±¾ÆÚÊÖÍ·¿â´æ(Æğ³õ+µ½´ï)ºÍ±¾ÆÚµÄĞèÇód
             y = inv_level_record[:, [t]] + order_record[:, [t]]
             d = demand[:, [t]]
-            # è®¡ç®—å½“å‰å‘¨æœŸçš„æˆæœ¬
+            # ¼ÆËãµ±Ç°ÖÜÆÚµÄ³É±¾
             period_cost = (self.c_r * order_record[:, [t]]+ self.h * np.maximum(y - d, 0)+ self.b * np.maximum(d - y, 0))
-            # å°†å½“å‰å‘¨æœŸçš„æˆæœ¬æ·»åŠ åˆ°æˆæœ¬è®°å½•ä¸­
+            # ½«µ±Ç°ÖÜÆÚµÄ³É±¾Ìí¼Óµ½³É±¾¼ÇÂ¼ÖĞ
             cost_per_period = np.hstack((cost_per_period, period_cost))
 
-            # è®¡ç®—ä¸‹ä¸€æœŸçš„åº“å­˜æ°´å¹³ lost_salesç³»ç»Ÿ
+            # ¼ÆËãÏÂÒ»ÆÚµÄ¿â´æË®Æ½ lost_salesÏµÍ³
             next_inv_level = np.maximum(y - d, 0)
 
-            # ä½¿ç”¨ hstack æ·»åŠ åˆ—
+            # Ê¹ÓÃ hstack Ìí¼ÓÁĞ
             inv_level_record = np.hstack((inv_level_record, next_inv_level))
             y_level_record = np.hstack((y_level_record, y))
 
 
-        # è®¡ç®—æ¯ä¸ªè¿­ä»£ï¼ˆè¡Œï¼‰çš„æ€»æˆæœ¬
+        # ¼ÆËãÃ¿¸öµü´ú£¨ĞĞ£©µÄ×Ü³É±¾
         total_cost_per_iteration = np.sum(cost_per_period, axis=1)
         average_total_cost = np.mean(total_cost_per_iteration)
 
@@ -160,49 +160,50 @@ class dual_sourcing:
         }
 
 
-    def DDI_policy(self,demand,Se=None,D_2_constraint=False,inventory_level=0):
+#¶ÔDDI²ßÂÔ¼ÓÉÏ¿ìÇşµÀµÄÔ¼Êø ÕâÑùÈ·±£ÄÜ¹»Âú×ãD_2µÄÔ¼Êø
+    def DDI_policy(self,demand,Se=None,D_2_constraint=True,inventory_level=0):
         Se=self.Se if Se is None else Se
         lost_sales_record=self.lost_sales(demand=demand,S=None,inventory_level=0)
 
         iter_num = demand.shape[0]
         period_length = demand.shape[1]
         
-        #å®šä¹‰åŒæºç³»ç»Ÿçš„ä¸¤ä¸ªæ¸ é“çš„è®¢è´§é‡ï¼Œæ¯ä¸€æ¡è·¯å¾„éƒ½èµ‹äºˆç›¸åŒçš„åˆå§‹è®¢è´§é‡
+        #¶¨ÒåË«Ô´ÏµÍ³µÄÁ½¸öÇşµÀµÄ¶©»õÁ¿£¬Ã¿Ò»ÌõÂ·¾¶¶¼¸³ÓèÏàÍ¬µÄ³õÊ¼¶©»õÁ¿
         x_init = np.tile(self.x_init_DDI, (iter_num, 1))
         q_init= np.tile(self.q_init,(iter_num,1))
-        #è¿™é‡Œè®°å½•ä¸¤ä¸ªæ¸ é“çš„è®¢è´§é‡
+        #ÕâÀï¼ÇÂ¼Á½¸öÇşµÀµÄ¶©»õÁ¿
         order_record_regular = x_init.copy()
         order_record_expe=q_init.copy()
 
-        # åˆå§‹åŒ–è®°å½•æ•°ç»„
+        # ³õÊ¼»¯¼ÇÂ¼Êı×é
         inv_level_record = np.ones((iter_num, 1)) * inventory_level
         cost_per_period = np.zeros((iter_num, 0)) 
         y_level_record = np.zeros((iter_num, 1))
 
         for t in range(period_length):
-            #å¯¹äºæ…¢æ¸ é“æ¥è¯´ï¼Œä¸‹è®¢å•çš„è¿‡ç¨‹åªéœ€è¦è¿›è¡ŒT-l_ræœŸï¼Œä¹‹åä¸‹çš„è®¢å•ä¸ä¼šåœ¨TæœŸå†…åˆ°è¾¾
+            #¶ÔÓÚÂıÇşµÀÀ´Ëµ£¬ÏÂ¶©µ¥µÄ¹ı³ÌÖ»ĞèÒª½øĞĞT-l_rÆÚ£¬Ö®ºóÏÂµÄ¶©µ¥²»»áÔÚTÆÚÄÚµ½´ï
             if order_record_regular.shape[1] < period_length:
-                # ç¡®ä¿ç´¢å¼•ä¸è¶Šç•Œ
+                # È·±£Ë÷Òı²»Ô½½ç
                 end_idx = min(t + self.l_r, order_record_regular.shape[1])
-                #å¯¹äºt>=0ä¹‹åçš„æ¯ä¸€æœŸä¸‹è¾¾çš„è®¢å•éƒ½æ˜¯å’Œlost_salesä¸­çš„ç»“æœç›¸åŒ
+                #¶ÔÓÚt>=0Ö®ºóµÄÃ¿Ò»ÆÚÏÂ´ïµÄ¶©µ¥¶¼ÊÇºÍlost_salesÖĞµÄ½á¹ûÏàÍ¬
                 order_regular = lost_sales_record['order_record'][:, t+self.l_r][:, None]
                 order_record_regular = np.hstack((order_record_regular, order_regular))
-            #å¯¹äºå¿«æ¸ é“æ¥è¯´ï¼Œä¸‹è®¢å•çš„è¿‡ç¨‹åªéœ€è¦è¿›è¡ŒT-l_eæœŸï¼Œä¹‹åä¸‹çš„è®¢å•ä¹Ÿä¸ä¼šåœ¨TæœŸå†…åˆ°è¾¾
+            #¶ÔÓÚ¿ìÇşµÀÀ´Ëµ£¬ÏÂ¶©µ¥µÄ¹ı³ÌÖ»ĞèÒª½øĞĞT-l_eÆÚ£¬Ö®ºóÏÂµÄ¶©µ¥Ò²²»»áÔÚTÆÚÄÚµ½´ï
             if order_record_expe.shape[1] < period_length:
-                # ç¡®ä¿ç´¢å¼•ä¸è¶Šç•Œ
+                # È·±£Ë÷Òı²»Ô½½ç
                 end_idx = min(t + self.l_e, order_record_expe.shape[1])
-                #æ ¹æ®æ›´æ–°çš„æœ€æ–°ç‰ˆç­–ç•¥ï¼Œå‰delta l+1æœŸçš„ä¸‹å•çš„åŠ æ€¥æ¸ é“è®¢è´§é‡å‡ä¸º0
+                #¸ù¾İ¸üĞÂµÄ×îĞÂ°æ²ßÂÔ£¬Ç°delta l+1ÆÚµÄÏÂµ¥µÄ¼Ó¼±ÇşµÀ¶©»õÁ¿¾ùÎª0
                 if t<self.l+1:
                     order_e=np.zeros((iter_num, 1))
                     order_record_expe=np.hstack((order_record_expe,order_e))
                 else:
-                    #åˆå§‹çš„yä¸º0 ä¸ç”¨å–å‡º
-                    # y_inv=lost_sales_record['y_level_record'][:, 1:]
-                    # net_inv = y_inv - demand
-                    # #å¯¹äºæ¯ä¸€æ¡pathçš„æ¯ä¸€æœŸï¼Œæ±‚å‡ºå¯¹åº”æ—¶é—´ç‚¹çš„backlogå€¼
-                    # BACK = -np.minimum(net_inv, 0)
-                    BACK=np.maximum(0,demand[:,:t]-lost_sales_record['order_record'][:,:t])
-                    #è®¡ç®—æ¯ä¸ªæ—¶é—´ç‚¹ä¹‹å‰ï¼ˆåŒ…æ‹¬å½“å‰æ—¶é—´ç‚¹ï¼‰çš„æœ€å¤§ BACK å€¼
+                    #³õÊ¼µÄyÎª0 ²»ÓÃÈ¡³ö
+                    y_inv=lost_sales_record['y_level_record'][:, 1:]
+                    net_inv = y_inv - demand
+                    #¶ÔÓÚÃ¿Ò»ÌõpathµÄÃ¿Ò»ÆÚ£¬Çó³ö¶ÔÓ¦Ê±¼äµãµÄbacklogÖµ
+                    BACK = -np.minimum(net_inv, 0)
+
+                    #¼ÆËãÃ¿¸öÊ±¼äµãÖ®Ç°£¨°üÀ¨µ±Ç°Ê±¼äµã£©µÄ×î´ó BACK Öµ
                     cumulative_max = np.maximum.accumulate(BACK, axis=1)
                     if t==self.l+1:
                         order_e=cumulative_max[:,t-self.l-1][:,None]
@@ -218,7 +219,7 @@ class dual_sourcing:
             y = inv_level_record[:, [t]] + order_record_regular[:, [t]]+order_record_expe[:,[t]]
             d=demand[:,[t]]
 
-            # è®¡ç®—å½“å‰å‘¨æœŸçš„æˆæœ¬
+            # ¼ÆËãµ±Ç°ÖÜÆÚµÄ³É±¾
             period_cost = (
                 self.c_r * order_record_regular[:, [t]]+self.c_e * order_record_expe[:, [t]]
                 + self.h * np.maximum(y - d, 0)
@@ -226,27 +227,27 @@ class dual_sourcing:
             )
 
             
-            # å°†å½“å‰å‘¨æœŸçš„æˆæœ¬æ·»åŠ åˆ°æˆæœ¬è®°å½•ä¸­
+            # ½«µ±Ç°ÖÜÆÚµÄ³É±¾Ìí¼Óµ½³É±¾¼ÇÂ¼ÖĞ
             cost_per_period = np.hstack((cost_per_period, period_cost))
 
 
-            # è®¡ç®—ä¸‹ä¸€æœŸçš„åº“å­˜æ°´å¹³
+            # ¼ÆËãÏÂÒ»ÆÚµÄ¿â´æË®Æ½
             next_inv_level = y - d
 
             
-            # ä½¿ç”¨ hstack æ·»åŠ åˆ—
+            # Ê¹ÓÃ hstack Ìí¼ÓÁĞ
             inv_level_record = np.hstack((inv_level_record, next_inv_level))
             y_level_record = np.hstack((y_level_record, y))
 
 
-        # è®¡ç®—æ¯ä¸ªè¿­ä»£ï¼ˆè¡Œï¼‰çš„æ€»æˆæœ¬
+        # ¼ÆËãÃ¿¸öµü´ú£¨ĞĞ£©µÄ×Ü³É±¾
         total_cost_per_iteration = np.sum(cost_per_period, axis=1)
         average_total_cost = np.mean(total_cost_per_iteration)
-        print(f"å¹³å‡æ€»æˆæœ¬: {average_total_cost}")
+        print(f"Æ½¾ù×Ü³É±¾: {average_total_cost}")
 
         return {
-            'order_record_r': order_record_regular,
-            'order_record_e': order_record_expe,
+            'order_record_regular': order_record_regular,
+            'order_record_expe': order_record_expe,
             'inv_level_record': inv_level_record,
             'y_level_record': y_level_record,
             'cost_per_period': cost_per_period,
@@ -260,66 +261,61 @@ class dual_sourcing:
         iter_num = demand.shape[0]
         period_length = demand.shape[1]
 
-        #å®šä¹‰åŒæºç³»ç»Ÿä¸¤ä¸ªæ¸ é“çš„è®¢è´§é‡
+        #¶¨ÒåË«Ô´ÏµÍ³Á½¸öÇşµÀµÄ¶©»õÁ¿
         x_init=np.tile(self.x_init_SDI,(iter_num,1))
         q_init=np.tile(self.q_init,(iter_num,1))
-        #è®°å½•ä¸¤ä¸ªæ¸ é“çš„è®¢è´§é‡
+        #¼ÇÂ¼Á½¸öÇşµÀµÄ¶©»õÁ¿
         order_record_regular = x_init.copy()
         order_record_expe=q_init.copy()
 
-        # åˆå§‹åŒ–è®°å½•æ•°ç»„
+        # ³õÊ¼»¯¼ÇÂ¼Êı×é
         inv_level_record = np.ones((iter_num, 1)) * inventory_level
         cost_per_period = np.zeros((iter_num, 0)) 
         y_level_record = np.zeros((iter_num, 1))
         
         for t in range(period_length):
             if order_record_expe.shape[1] < period_length:
-                # ç¡®ä¿ç´¢å¼•ä¸è¶Šç•Œ
-                IP_e=inv_level_record[:,[t]]+order_record_expe[:,t:t+self.l_e].sum(axis=1)[:,None]
-                +order_record_regular[:,t:t+self.l_e+1].sum(axis=1)[:,None]
+                # È·±£Ë÷Òı²»Ô½½ç
+                IP_e=inv_level_record[:,[t]]+order_record_expe[:,t:t+self.l_e].sum(axis=1)[:,None]+order_record_regular[:,t:t+self.l_e+1].sum(axis=1)[:,None]
                 order_e=np.maximum(np.ones(IP_e.shape) * self.Se - IP_e, 0)
                 order_record_expe=np.hstack((order_record_expe,order_e))
             
             if order_record_regular.shape[1] < period_length:
-                # ç¡®ä¿ç´¢å¼•ä¸è¶Šç•Œ
+                # È·±£Ë÷Òı²»Ô½½ç
                 end_idx = min(t + self.l_r, order_record_regular.shape[1])
-                IP_r=inv_level_record[:,[t]]+order_record_expe[:,t:t+self.l_e+1].sum(axis=1)[:,None]
-                +order_record_regular[:,t:t+self.l_r].sum(axis=1)[:,None]
+                IP_r=inv_level_record[:,[t]]+order_record_expe[:,t:t+self.l_e+1].sum(axis=1)[:,None]+order_record_regular[:,t:t+self.l_r].sum(axis=1)[:,None]
                 order_r=np.maximum(np.ones(IP_r.shape) * (self.Se+self.S_l) - IP_r, 0)
                 order_record_regular=np.hstack((order_record_regular,order_r))
 
             y = inv_level_record[:, [t]] + order_record_regular[:, [t]]+order_record_expe[:,[t]]
             d=demand[:,[t]]
 
-            # è®¡ç®—å½“å‰å‘¨æœŸçš„æˆæœ¬
+            # ¼ÆËãµ±Ç°ÖÜÆÚµÄ³É±¾
             period_cost = (
-                self.c_r * order_record_regular[:, [t]]+self.c_e * order_record_expe[:, [t]]
-                + self.h * np.maximum(y - d, 0)
-                + self.b * np.maximum(d - y, 0)
-            )
+                self.c_r * order_record_regular[:, [t]]+self.c_e * order_record_expe[:, [t]]+ self.h * np.maximum(y - d, 0)+ self.b * np.maximum(d - y, 0))
 
             
-            # å°†å½“å‰å‘¨æœŸçš„æˆæœ¬æ·»åŠ åˆ°æˆæœ¬è®°å½•ä¸­
+            # ½«µ±Ç°ÖÜÆÚµÄ³É±¾Ìí¼Óµ½³É±¾¼ÇÂ¼ÖĞ
             cost_per_period = np.hstack((cost_per_period, period_cost))
 
 
-            # è®¡ç®—ä¸‹ä¸€æœŸçš„åº“å­˜æ°´å¹³
+            # ¼ÆËãÏÂÒ»ÆÚµÄ¿â´æË®Æ½
             next_inv_level = y - d
 
             
-            # ä½¿ç”¨ hstack æ·»åŠ åˆ—
+            # Ê¹ÓÃ hstack Ìí¼ÓÁĞ
             inv_level_record = np.hstack((inv_level_record, next_inv_level))
             y_level_record = np.hstack((y_level_record, y))
 
 
-        # è®¡ç®—æ¯ä¸ªè¿­ä»£ï¼ˆè¡Œï¼‰çš„æ€»æˆæœ¬
+        # ¼ÆËãÃ¿¸öµü´ú£¨ĞĞ£©µÄ×Ü³É±¾
         total_cost_per_iteration = np.sum(cost_per_period, axis=1)
         average_total_cost = np.mean(total_cost_per_iteration)
-        print(f"å¹³å‡æ€»æˆæœ¬: {average_total_cost}")
+        print(f"Æ½¾ù×Ü³É±¾: {average_total_cost}")
 
         return {
-            'order_record_r': order_record_regular,
-            'order_record_e': order_record_expe,
+            'order_record_regular': order_record_regular,
+            'order_record_expe': order_record_expe,
             'inv_level_record': inv_level_record,
             'y_level_record': y_level_record,
             'cost_per_period': cost_per_period,
@@ -327,20 +323,20 @@ class dual_sourcing:
             'average_total_cost': average_total_cost
         }       
 
-#å«ä¹‰æ˜¯ç»™å®šå¸¸è§„æ¸ é“å’ŒåŠ æ€¥æ¸ é“çš„inventory positionä¹‹åå¦‚ä½•è®¢è´§å’Œæ¯æ¡è·¯å¾„çš„æˆæœ¬
+#º¬ÒåÊÇ¸ø¶¨³£¹æÇşµÀºÍ¼Ó¼±ÇşµÀµÄinventory positionÖ®ºóÈçºÎ¶©»õºÍÃ¿ÌõÂ·¾¶µÄ³É±¾
     def cal_order_up_to(self,demand,S_e,S_r,x_init,q_init,inventory_level=0):
 
         iter_num = demand.shape[0]
         period_length = demand.shape[1]
 
-        #å®šä¹‰åŒæºç³»ç»Ÿä¸¤ä¸ªæ¸ é“çš„è®¢è´§é‡
+        #¶¨ÒåË«Ô´ÏµÍ³Á½¸öÇşµÀµÄ¶©»õÁ¿
         x_init=np.tile(x_init,(iter_num,1))
         q_init=np.tile(q_init,(iter_num,1))
-        #è®°å½•ä¸¤ä¸ªæ¸ é“çš„è®¢è´§é‡
+        #¼ÇÂ¼Á½¸öÇşµÀµÄ¶©»õÁ¿
         order_record_regular = x_init.copy()
         order_record_expe=q_init.copy()
 
-        # åˆå§‹åŒ–è®°å½•æ•°ç»„
+        # ³õÊ¼»¯¼ÇÂ¼Êı×é
         inv_level_record = np.ones((iter_num, 1)) * inventory_level
         cost_per_period = np.zeros((iter_num, 0)) 
         y_level_record = np.zeros((iter_num, 1))
@@ -348,7 +344,7 @@ class dual_sourcing:
 
         for t in range(period_length):
             if order_record_expe.shape[1] < period_length:
-                # ç¡®ä¿ç´¢å¼•ä¸è¶Šç•Œ
+                # È·±£Ë÷Òı²»Ô½½ç
                 end_idx = min(t + self.l_e, order_record_expe.shape[1])
                 IP_e=inv_level_record[:,[t]]+order_record_expe[:,t:t+self.l_e].sum(axis=1)[:,None]+order_record_regular[:,t:t+self.l_e+1].sum(axis=1)[:,None]
                 order_e=np.maximum(np.ones(IP_e.shape) * S_e - IP_e, 0)
@@ -357,7 +353,7 @@ class dual_sourcing:
                 overshoot_record=np.hstack((overshoot_record,overshoot))
             
             if order_record_regular.shape[1] < period_length:
-                # ç¡®ä¿ç´¢å¼•ä¸è¶Šç•Œ
+                # È·±£Ë÷Òı²»Ô½½ç
                 end_idx = min(t + self.l_r, order_record_regular.shape[1])
                 IP_r=inv_level_record[:,[t]]+order_record_expe[:,t:t+self.l_e+1].sum(axis=1)[:,None]+order_record_regular[:,t:t+self.l_r].sum(axis=1)[:,None]
                 order_r=np.maximum(np.ones(IP_r.shape) * S_r - IP_r, 0)
@@ -366,34 +362,31 @@ class dual_sourcing:
             y = inv_level_record[:, [t]] + order_record_regular[:, [t]]+order_record_expe[:,[t]]
             d=demand[:,[t]]
 
-            # è®¡ç®—å½“å‰å‘¨æœŸçš„æˆæœ¬
+            # ¼ÆËãµ±Ç°ÖÜÆÚµÄ³É±¾
             period_cost = (
-                self.c_r * order_record_regular[:, [t]]+self.c_e * order_record_expe[:, [t]]
-                + self.h * np.maximum(y - d, 0)
-                + self.b * np.maximum(d - y, 0)
-            )
+                self.c_r * order_record_regular[:, [t]]+self.c_e * order_record_expe[:, [t]]+ self.h * np.maximum(y - d, 0)+ self.b * np.maximum(d - y, 0))
 
             
-            # å°†å½“å‰å‘¨æœŸçš„æˆæœ¬æ·»åŠ åˆ°æˆæœ¬è®°å½•ä¸­
+            # ½«µ±Ç°ÖÜÆÚµÄ³É±¾Ìí¼Óµ½³É±¾¼ÇÂ¼ÖĞ
             cost_per_period = np.hstack((cost_per_period, period_cost))
 
 
-            # è®¡ç®—ä¸‹ä¸€æœŸçš„åº“å­˜æ°´å¹³
+            # ¼ÆËãÏÂÒ»ÆÚµÄ¿â´æË®Æ½
             next_inv_level = y - d
 
             
-            # ä½¿ç”¨ hstack æ·»åŠ åˆ—
+            # Ê¹ÓÃ hstack Ìí¼ÓÁĞ
             inv_level_record = np.hstack((inv_level_record, next_inv_level))
             y_level_record = np.hstack((y_level_record, y))
 
 
-        # è®¡ç®—æ¯ä¸ªè¿­ä»£ï¼ˆè¡Œï¼‰çš„æ€»æˆæœ¬
+        # ¼ÆËãÃ¿¸öµü´ú£¨ĞĞ£©µÄ×Ü³É±¾
         total_cost_per_iteration = np.sum(cost_per_period, axis=1)
         average_total_cost = np.mean(total_cost_per_iteration)
 
         return {
-            'order_record_r': order_record_regular,
-            'order_record_e': order_record_expe,
+            'order_record_regular': order_record_regular,
+            'order_record_expe': order_record_expe,
             'inv_level_record': inv_level_record,
             'y_level_record': y_level_record,
             'cost_per_period': cost_per_period,
@@ -404,16 +397,16 @@ class dual_sourcing:
 
 
     def DI_policy(self,demand,sample,x_init=None,q_init=None,inventory_level=0):
-        #å…ˆæ‰¾åˆ°deltaçš„ç¨³æ€åˆ†å¸ƒï¼Œç„¶åç»™å‡ºå¯èƒ½æœ€ä¼˜çš„ç»„åˆï¼ˆS_e,S_e+delta),åœ¨ç»„åˆä¸­æœç´¢æœ€ä¼˜æˆæœ¬
-        #å…ˆåˆ©ç”¨sample pathæ‰¾åˆ°ç¨³æ€åˆ†å¸ƒ
-        x_init=self.x_init_DDI if x_init is None else x_init
+        #ÏÈÕÒµ½deltaµÄÎÈÌ¬·Ö²¼£¬È»ºó¸ø³ö¿ÉÄÜ×îÓÅµÄ×éºÏ£¨S_e,S_e+delta),ÔÚ×éºÏÖĞËÑË÷×îÓÅ³É±¾
+        #ÏÈÀûÓÃsample pathÕÒµ½ÎÈÌ¬·Ö²¼
+        x_init=self.x_init_SDI if x_init is None else x_init
         q_init=self.q_init if q_init is None else q_init
 
-        delta_range = np.arange(0, self.Sr, self.num_search_range)
+        delta_range = np.arange(0, self.Se /self.num_search_range*(self.num_search_range+1), self.Se/self.num_search_range)
 
         DI_cost_record =[]
         for delta in delta_range:
-            record=self.cal_order_up_to(sample,self.Sr-delta,self.Sr,x_init,q_init,inventory_level=0)
+            record=self.cal_order_up_to(sample,self.Se,delta+self.Se,x_init,q_init,inventory_level=0)
            
             cost=record['average_total_cost']
             DI_cost_record.append(cost)
@@ -421,58 +414,45 @@ class dual_sourcing:
         optimal_delta = delta_range[min_cost_idx]
 
 
-        record_of_demand=self.cal_order_up_to(demand,self.Sr-optimal_delta,self.Sr,x_init,q_init,inventory_level=0)
-        return record_of_demand
-#TBSç­–ç•¥ä¸­åŠ æ€¥æ¸ é“æ˜¯order_up_to,å¸¸è§„æ¸ é“æ˜¯r
-    def cal_order_up_to_with_r(self,demand,S_e,r,x_init,q_init,inventory_level=0,constraint_D1=False):
+        record_of_demand=self.cal_order_up_to(demand,self.Se,self.Se+optimal_delta,x_init,q_init,inventory_level=0)
+        return record_of_demand['average_total_cost']
+#TBS²ßÂÔÖĞ¼Ó¼±ÇşµÀÊÇorder_up_to,³£¹æÇşµÀÊÇr
+    def cal_order_up_to_with_r(self,demand,S_e,r,x_init,q_init,inventory_level=0):
 
         iter_num = demand.shape[0]
         period_length = demand.shape[1]
 
-        #å®šä¹‰åŒæºç³»ç»Ÿä¸¤ä¸ªæ¸ é“çš„è®¢è´§é‡
+        #¶¨ÒåË«Ô´ÏµÍ³Á½¸öÇşµÀµÄ¶©»õÁ¿
         x_init=np.tile(x_init,(iter_num,1))
         q_init=np.tile(q_init,(iter_num,1))
-        #è®°å½•ä¸¤ä¸ªæ¸ é“çš„è®¢è´§é‡
+        #¼ÇÂ¼Á½¸öÇşµÀµÄ¶©»õÁ¿
         order_record_regular = x_init.copy()
         order_record_expe=q_init.copy()
 
-        # åˆå§‹åŒ–è®°å½•æ•°ç»„
+        # ³õÊ¼»¯¼ÇÂ¼Êı×é
         inv_level_record = np.ones((iter_num, 1)) * inventory_level
         cost_per_period = np.zeros((iter_num, 0)) 
         y_level_record = np.zeros((iter_num, 1))
-        overshoot_record=np.zeros((iter_num, 1))
 
         for t in range(period_length):
             if order_record_expe.shape[1] < period_length:
-                # ç¡®ä¿ç´¢å¼•ä¸è¶Šç•Œ
+                # È·±£Ë÷Òı²»Ô½½ç
                 end_idx = min(t + self.l_e, order_record_expe.shape[1])
                 IP_e=inv_level_record[:,[t]]+order_record_expe[:,t:t+self.l_e].sum(axis=1)[:,None]+order_record_regular[:,t:t+self.l_e+1].sum(axis=1)[:,None]
                 order_e=np.maximum(np.ones(IP_e.shape) * S_e - IP_e, 0)
                 order_record_expe=np.hstack((order_record_expe,order_e))
-                overshoot=np.maximum(IP_e-np.ones(IP_e.shape) * S_e, 0)
-                overshoot_record=np.hstack((overshoot_record,overshoot))
+            
             if order_record_regular.shape[1] < period_length:
-                # ç¡®ä¿ç´¢å¼•ä¸è¶Šç•Œ
+                # È·±£Ë÷Òı²»Ô½½ç
                 end_idx = min(t + self.l_r, order_record_regular.shape[1])
-                IP_r=inv_level_record[:,[t]]+order_record_expe[:,t:t+self.l_e+1].sum(axis=1)[:,None]\
-                +order_record_regular[:,t:t+self.l_r].sum(axis=1)[:,None]
+                IP_r=inv_level_record[:,[t]]+order_record_expe[:,t:t+self.l_e+1].sum(axis=1)[:,None]+order_record_regular[:,t:t+self.l_r].sum(axis=1)[:,None]
                 order_r=np.ones(IP_r.shape)*r
                 order_record_regular=np.hstack((order_record_regular,order_r))
-                if constraint_D1:
-                    IP_r=inv_level_record[:,[t]]+order_record_expe[:,t:t+self.l_e+1].sum(axis=1)[:,None]\
-                    +order_record_regular[:,t:t+self.l_r+1].sum(axis=1)[:,None]
-                    order_r_add=np.maximum(self.Sr - IP_r, 0)
-                    order_record_regular[:, -1:] = order_record_regular[:, -1:] + order_r_add
-                
-            # overshoot=np.maximum(overshoot_record[:,-1:]-demand[:,t]+order_record_regular[:, -1:], 0)
-            # overshoot_record=np.hstack((overshoot_record,overshoot))
-
-
 
             y = inv_level_record[:, [t]] + order_record_regular[:, [t]]+order_record_expe[:,[t]]
             d=demand[:,[t]]
 
-            # è®¡ç®—å½“å‰å‘¨æœŸçš„æˆæœ¬
+            # ¼ÆËãµ±Ç°ÖÜÆÚµÄ³É±¾
             period_cost = (
                 self.c_r * order_record_regular[:, [t]]+self.c_e * order_record_expe[:, [t]]
                 + self.h * np.maximum(y - d, 0)
@@ -480,178 +460,89 @@ class dual_sourcing:
             )
 
             
-            # å°†å½“å‰å‘¨æœŸçš„æˆæœ¬æ·»åŠ åˆ°æˆæœ¬è®°å½•ä¸­
+            # ½«µ±Ç°ÖÜÆÚµÄ³É±¾Ìí¼Óµ½³É±¾¼ÇÂ¼ÖĞ
             cost_per_period = np.hstack((cost_per_period, period_cost))
 
 
-            # è®¡ç®—ä¸‹ä¸€æœŸçš„åº“å­˜æ°´å¹³
+            # ¼ÆËãÏÂÒ»ÆÚµÄ¿â´æË®Æ½
             next_inv_level = y - d
 
             
-            # ä½¿ç”¨ hstack æ·»åŠ åˆ—
+            # Ê¹ÓÃ hstack Ìí¼ÓÁĞ
             inv_level_record = np.hstack((inv_level_record, next_inv_level))
             y_level_record = np.hstack((y_level_record, y))
 
 
-        # è®¡ç®—æ¯ä¸ªè¿­ä»£ï¼ˆè¡Œï¼‰çš„æ€»æˆæœ¬
+        # ¼ÆËãÃ¿¸öµü´ú£¨ĞĞ£©µÄ×Ü³É±¾
         total_cost_per_iteration = np.sum(cost_per_period, axis=1)
         average_total_cost = np.mean(total_cost_per_iteration)
 
         return {
-            'order_record_r': order_record_regular,
-            'order_record_e': order_record_expe,
+            'order_record_regular': order_record_regular,
+            'order_record_expe': order_record_expe,
             'inv_level_record': inv_level_record,
             'y_level_record': y_level_record,
             'cost_per_period': cost_per_period,
             'total_cost_per_iteration': total_cost_per_iteration,
-            'average_total_cost': average_total_cost,
-            'overshoot_record':overshoot_record
+            'average_total_cost': average_total_cost
         }       
 
-    def TBS_policy(self, sample, demand, mean, x_init=None, q_init=None):
-        x_init = self.x_init_DDI if x_init is None else x_init
-        q_init = self.q_init if q_init is None else q_init
-        r_range = np.linspace(0,3* mean, self.num_search_range)
-
-        TBS_cost_record = []      
-        best_Se_record  = []     
-        feasible_flags  = []    
-
+    def TBS_policy(self,sample,demand,mean,x_init=None,q_init=None):
+        x_init=self.x_init_SDI if x_init is None else x_init
+        q_init=self.q_init if q_init is None else q_init
+        r_range = np.linspace(0,mean,self.num_search_range+1)
+        TBS_cost_record =[]
         for r in r_range:
-            record = self.cal_order_up_to_with_r(sample, self.Se, r,
-                                                x_init, q_init,
-                                                inventory_level=0,
-                                                constraint_D1=False)
-            overshoot_record = record['overshoot_record']
-
-            # è®¡ç®— best_Se
-            variable = sample.cumsum(axis=1)[:, self.l_e][:, None]
-            variable = np.tile(variable, (1, 100))
-            best_Se = np.quantile(
-                variable - overshoot_record[:, -100:], 
-                self.b / (self.b + self.h)
-            )
-
-            # å†ç”¨ best_Se è®¡ç®—æˆæœ¬
-            result = self.cal_order_up_to_with_r(
-                demand, best_Se, r, x_init, q_init,
-                inventory_level=0, constraint_D1=False
-            )
-            cost = result['average_total_cost']
+            record=self.cal_order_up_to_with_r(sample,self.Se,r,x_init,q_init,inventory_level=0)
+            cost=record['average_total_cost']
             TBS_cost_record.append(cost)
-            best_Se_record.append(best_Se)
-
-            # æ£€æŸ¥æœåŠ¡æ°´å¹³çº¦æŸ
-            service_level_Sr = self.cal_fill_rate(sample, result)
-            feasible = np.all(service_level_Sr >= self.service_level)
-            feasible_flags.append(feasible)
-
-        # åªä¿ç•™æ»¡è¶³çº¦æŸçš„ç´¢å¼•
-        feasible_idx = [i for i, ok in enumerate(feasible_flags) if ok]
-        if not feasible_idx:
-            raise ValueError("æ²¡æœ‰ä»»ä½• r æ»¡è¶³æœåŠ¡æ°´å¹³çº¦æŸ")
-
-        # åœ¨å¯è¡Œè§£ä¸­é€‰æˆæœ¬æœ€å°çš„
-        costs_feasible = [TBS_cost_record[i] for i in feasible_idx]
-        min_idx_in_feasible = feasible_idx[int(np.argmin(costs_feasible))]
-
-        best_r  = r_range[min_idx_in_feasible]
-        best_Se = best_Se_record[min_idx_in_feasible]
-
-        # æœ€ä¼˜è®°å½•
-        optimal_record = self.cal_order_up_to_with_r(
-            demand, best_Se, best_r,
-            x_init, q_init,
-            inventory_level=0,
-            constraint_D1=False
-        )
-        return optimal_record
-   
+        min_cost_idx = np.argmin(TBS_cost_record)
+        best_r=r_range[min_cost_idx]
+        optimal_record=self.cal_order_up_to_with_r(demand,self.Se,best_r,x_init,q_init,inventory_level=0)
+        return optimal_record    
             
-    def cal_fill_rate(self, demand, result_record_dict):
-        #å¯¹äºæ¯æ¡è·¯å¾„çš„æ¯ä¸ªèŠ‚ç‚¹ï¼Œè®¡ç®—åœ¨åˆ°è¾¾æ—¶åˆ»çš„æ€»åº“å­˜æ˜¯å¦èƒ½æ»¡è¶³éœ€æ±‚
-        #ç›¸å½“äºå¯ä»¥å¾—åˆ°ä¸€ä¸ª[N,T]æ•°ç»„ï¼Œæ¯ä¸€ä¸ªç‚¹éƒ½æœ‰è‹¥å¹²ä¸ª0-1å˜é‡è¡¨è¾¾æ˜¯å¦æ»¡è¶³(å¯¹åº”ç€è‹¥å¹²æ¡è·¯å¾„)ï¼Œç„¶åå¯¹æ¯ä¸ªç‚¹éƒ½å¯ä»¥å¾—åˆ°ä¸€ä¸ªæ¦‚ç‡ï¼Œæœ€åå¯¹æ¯ä¸€åˆ—æ±‚å¹³å‡
-        num_of_iter = demand.shape[0]
-        
-        order_record_r = result_record_dict['order_record_r']
-        order_record_e = result_record_dict['order_record_e']
-        inv_level_record = result_record_dict['inv_level_record']
-        period_length = inv_level_record.shape[1]
-        
-        service_level_Sr = []
-        #service_level_Se = []
-        
-        # å¯¹äºæ¯ä¸ªæ—¶é—´ç‚¹tï¼Œä½¿ç”¨å¤šæ¡è·¯å¾„æ¥æ£€éªŒæœåŠ¡æ°´å¹³
-        for t in range(period_length - self.l_r-1):
-            # ä¸ºå½“å‰æ—¶é—´ç‚¹tåˆ›å»ºå­˜å‚¨æœåŠ¡æ°´å¹³çš„æ•°ç»„
-            t_service_level_Sr = []
-            # t_service_level_Se = []
-
-            # å¯¹æ¯æ¡æ ·æœ¬è·¯å¾„è¿›è¡Œæ£€æŸ¥
-            for sample in range(num_of_iter):
-                current_future_demand_path = demand[sample, t: t+self.l_r+1]
-                current_pipeline_r=order_record_r[:, t: t+self.l_r+1].sum(axis=1)[:,None]
-                current_pipeline_e=order_record_e[:, t: t + self.l_e + 1].sum(axis=1)[:,None]
-                current_inventory_level=inv_level_record[:, t][:,None]
-                inventory_final=current_inventory_level+current_pipeline_r+current_pipeline_e-current_future_demand_path.sum()
-                #è®¡ç®—inventory_finalå¤§äº0çš„æ¯”ä¾‹
-                t_service_level_Sr.append((inventory_final> 0).mean())
-                
             
-            # å¯¹å½“å‰æ—¶é—´ç‚¹tçš„æ‰€æœ‰æ ·æœ¬è·¯å¾„æ±‚å¹³å‡
-            service_level_Sr.append(np.mean(t_service_level_Sr))
-            # service_level_Se.append(np.mean(t_service_level_Se))
-        
-        return np.array(service_level_Sr)
+            
             
 if __name__ == "__main__":
-    # è®¾ç½®å‚æ•°
-    c_r = 0    # å¸¸è§„è®¢å•æˆæœ¬
-    c_e = 10   # åŠ æ€¥è®¢å•æˆæœ¬
-    h = 1      # åº“å­˜æŒæœ‰æˆæœ¬
+    # ÉèÖÃ²ÎÊı
+    c_r = 0    # ³£¹æ¶©µ¥³É±¾
+    c_e = 10   # ¼Ó¼±¶©µ¥³É±¾
+    h = 1      # ¿â´æ³ÖÓĞ³É±¾
 
-    l_r = 3  # å¸¸è§„è®¢å•æå‰æœŸ
-    l_e = 1    # åŠ æ€¥è®¢å•æå‰æœŸ
-    b = c_e+h*(l_r+1)    # ç¼ºè´§æˆæœ¬
-    T = 30   # æ—¶é—´å‘¨æœŸæ•°
-    N = 500  # æ¨¡æ‹Ÿè·¯å¾„æ•°é‡
-    service_level = 0.95  # æœåŠ¡æ°´å¹³
-    N_1=100
+    l_r = 3  # ³£¹æ¶©µ¥ÌáÇ°ÆÚ
+    l_e = 1    # ¼Ó¼±¶©µ¥ÌáÇ°ÆÚ
+    b = c_e+h*(l_r+1)    # È±»õ³É±¾
+    T = 90   # Ê±¼äÖÜÆÚÊı
+    N = 500  # Ä£ÄâÂ·¾¶ÊıÁ¿
+    service_level = 0.9  # ·şÎñË®Æ½
     
-    # ç”Ÿæˆéœ€æ±‚æ•°æ® - ä½¿ç”¨æ­£æ€åˆ†å¸ƒ
-    distribution = ('norm', (100, 10))  # å‡å€¼ä¸º10ï¼Œæ ‡å‡†å·®ä¸º10çš„æ­£æ€åˆ†å¸ƒ
+    # Éú³ÉĞèÇóÊı¾İ - Ê¹ÓÃÕıÌ¬·Ö²¼
+    distribution = ('norm', (100, 10))  # ¾ùÖµÎª10£¬±ê×¼²îÎª10µÄÕıÌ¬·Ö²¼
     demand = sample_generation(distribution, (N, T), random_seed=36)
-    sample= sample_generation(distribution, (N_1, 1000), random_seed=42)
+    sample= sample_generation(distribution, (N, 500), random_seed=42)
     
-    # åˆ›å»º dual_sourcing å®ä¾‹
+    # ´´½¨ dual_sourcing ÊµÀı
     ds = dual_sourcing(c_r, c_e, h, b, l_r, l_e, demand, service_level)
+    
 
-    print('\næ‰§è¡Œåªç”¨å¸¸è§„æ¸ é“çš„ç­–ç•¥')
-    single_source_result=ds.single_lost_sales(demand, S=None, inventory_level=0)
-    print(f"åªç”¨å•æºç­–ç•¥å¹³å‡æ€»æˆæœ¬:{single_source_result['average_total_cost']}")
-
-
-    lost_sales_result = ds.lost_sales(demand, S=None, inventory_level=0)
-    print("\næ‰§è¡ŒDDIåŒæºç­–ç•¥...")
+    print("\nÖ´ĞĞDDIË«Ô´²ßÂÔ...")
     ddi_result = ds.DDI_policy(demand, Se=None,D_2_constraint=True,inventory_level=0)
-    print(f"DDIåŒæºç­–ç•¥å¹³å‡æ€»æˆæœ¬: {ddi_result['average_total_cost']}")
-
-    # print(ddi_result['order_record_regular'])
+    print(f"DDIË«Ô´²ßÂÔÆ½¾ù×Ü³É±¾: {ddi_result['average_total_cost']}")
 
 
-    # print("\næ‰§è¡ŒSDIåŒæºç­–ç•¥...")
-    # sdi_result = ds.SDI_policy(demand, inventory_level=0)
-    # print(f"SDIåŒæºç­–ç•¥å¹³å‡æ€»æˆæœ¬: {sdi_result['average_total_cost']}")
+    print("\nÖ´ĞĞSDIË«Ô´²ßÂÔ...")
+    sdi_result = ds.SDI_policy(demand, inventory_level=0)
+    print(f"SDIË«Ô´²ßÂÔÆ½¾ù×Ü³É±¾: {sdi_result['average_total_cost']}")
 
 
-    #è°ƒç”¨TBSç­–ç•¥
+    #µ÷ÓÃTBS²ßÂÔ
     print('TBS')
     TBS_result=ds.TBS_policy(sample,demand,100,x_init=None,q_init=None)
     print(TBS_result['average_total_cost'])
 
 
-
-    # # è°ƒç”¨DIç­–ç•¥
+    # # µ÷ÓÃDI²ßÂÔ
     di_cost = ds.DI_policy(demand, sample, x_init=None, q_init=None, inventory_level=0)
-    print(f"DIç­–ç•¥å¹³å‡æ€»æˆæœ¬: {di_cost['average_total_cost']}")
+    print(f"DI²ßÂÔÆ½¾ù×Ü³É±¾: {di_cost}")
     
