@@ -644,7 +644,7 @@ class dual_sourcing:
             np.savetxt(f"{prefix}_order_record_e.csv",
                        result_record_dict["order_record_e"],
                        delimiter=",", fmt="%.2f")
-        print(f"have saved {prefix} to CSV ")
+        print(f"已保存 {prefix} 的订货量到 CSV 文件")
             
 if __name__ == "__main__":
     # 设置参数
@@ -657,7 +657,7 @@ if __name__ == "__main__":
     b = c_e+h*(l_r+1)    # 缺货成本
     T = 30   # 时间周期数
     N = 500  # 模拟路径数量
-    service_level = 0.8 # 服务水平
+    service_level = 0.9  # 服务水平
     N_1=100
     
     # 生成需求数据 - 使用正态分布

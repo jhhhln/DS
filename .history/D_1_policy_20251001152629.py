@@ -50,7 +50,9 @@ class dual_sourcing:
 #计算S1,到S_(l_r+1)
     def cum_demand_quantile(self):
         #对需求数组先向右求和，然后对每一列分别取分位数，序号为k取的是(k+1)个D的情况
-        q_all = np.quantile(self.cum_demand,q=self.service_level,axis=0)  
+        q_all = np.quantile(self.cum_demand,
+                            q=self.service_level,
+                            axis=0)  
         return q_all[:self.l_r + 1]
 
 #计算S_l函数
@@ -118,19 +120,19 @@ class dual_sourcing:
         period_length = demand.shape[1]
         
         x_init = np.tile(self.x_init_DDI, (iter_num, 1))
-        order_record_r = x_init.copy()
+        order_record = x_init.copy()
         inv_level_record = np.ones((iter_num, 1)) * inventory_level
         cost_per_period = np.zeros((iter_num, 0)) 
         y_level_record = np.zeros((iter_num, 1))
 
 
         for t in range(period_length):
-            if order_record_r.shape[1] < period_length:
+            if order_record.shape[1] < period_length:
                 # end_idx = min(t + self.l_r, order_record.shape[1])
-                x_order = np.maximum(np.ones((iter_num, 1)) * S- order_record_r[:, t:t + self.l_r].sum(axis=1)[:, None]- inv_level_record[:, [t]], 0)
-                order_record_r = np.hstack((order_record_r, x_order))
+                x_order = np.maximum(np.ones((iter_num, 1)) * S- order_record[:, t:t + self.l_r].sum(axis=1)[:, None]- inv_level_record[:, [t]], 0)
+                order_record = np.hstack((order_record, x_order))
 
-            y = inv_level_record[:, [t]] + order_record_r[:, [t]]
+            y = inv_level_record[:, [t]] + order_record[:, [t]]
             d = demand[:, [t]]
             
             next_inv_level = y - d 
@@ -138,7 +140,7 @@ class dual_sourcing:
             holding_cost = self.h * np.maximum(next_inv_level, 0)
             backlog_cost = self.b *np.maximum(-next_inv_level, 0)
             
-            period_cost = (self.c_r * order_record_r[:, [t]] + holding_cost + backlog_cost)
+            period_cost = (self.c_r * order_record[:, [t]] + holding_cost + backlog_cost)
             
             cost_per_period = np.hstack((cost_per_period, period_cost))
 
@@ -149,7 +151,7 @@ class dual_sourcing:
         average_total_cost = np.mean(total_cost_per_iteration)
 
         return {
-            'order_record_r': order_record_r,
+            'order_record': order_record,
             'inv_level_record': inv_level_record,
             'y_level_record': y_level_record,
             'cost_per_period': cost_per_period,
@@ -243,7 +245,7 @@ class dual_sourcing:
         # 计算每个迭代（行）的总成本
         total_cost_per_iteration = np.sum(cost_per_period, axis=1)
         average_total_cost = np.mean(total_cost_per_iteration)
-        # print(f"平均总成本: {average_total_cost}")
+        print(f"平均总成本: {average_total_cost}")
 
         return {
             'order_record_r': order_record_regular,
@@ -415,12 +417,13 @@ class dual_sourcing:
         DI_cost_record =[]
         for delta in delta_range:
             record=self.cal_order_up_to(sample,self.Sr-delta,self.Sr,x_init,q_init,inventory_level=0)
+           
             cost=record['average_total_cost']
             DI_cost_record.append(cost)
         min_cost_idx = np.argmin(DI_cost_record)
         optimal_delta = delta_range[min_cost_idx]
-        print(f"最优delta: {optimal_delta}, 最优成本: {DI_cost_record[min_cost_idx]}")
-        print(f"对应的(S_e,S_r): ({self.Sr-optimal_delta},{self.Sr})")
+
+
         record_of_demand=self.cal_order_up_to(demand,self.Sr-optimal_delta,self.Sr,x_init,q_init,inventory_level=0)
         return record_of_demand
 #TBS策略中加急渠道是order_up_to,常规渠道是r
@@ -566,39 +569,7 @@ class dual_sourcing:
             constraint_D1=False
         )
         return optimal_record
-    def cal_fill_rate_single(self, demand, result_record_dict):
-        #对于每条路径的每个节点，计算在到达时刻的总库存是否能满足需求
-        #相当于可以得到一个[N,T]数组，每一个点都有若干个0-1变量表达是否满足(对应着若干条路径)，然后对每个点都可以得到一个概率，最后对每一列求平均
-        num_of_iter = demand.shape[0]
-        
-        order_record_r = result_record_dict['order_record_r']
-        inv_level_record = result_record_dict['inv_level_record']
-        period_length = inv_level_record.shape[1]
-        
-        service_level_Sr = []
-        #service_level_Se = []
-        
-        # 对于每个时间点t，使用多条路径来检验服务水平
-        for t in range(period_length - self.l_r-1):
-            # 为当前时间点t创建存储服务水平的数组
-            t_service_level_Sr = []
-            # t_service_level_Se = []
-
-            # 对每条样本路径进行检查
-            for sample in range(num_of_iter):
-                current_future_demand_path = demand[sample, t: t+self.l_r+1]
-                current_pipeline_r=order_record_r[:, t: t+self.l_r+1].sum(axis=1)[:,None]
-                current_inventory_level=inv_level_record[:, t][:,None]
-                inventory_final=current_inventory_level+current_pipeline_r-current_future_demand_path.sum()
-                #计算inventory_final大于0的比例
-                t_service_level_Sr.append((inventory_final> 0).mean())
-                
-            
-            # 对当前时间点t的所有样本路径求平均
-            service_level_Sr.append(np.mean(t_service_level_Sr))
-            # service_level_Se.append(np.mean(t_service_level_Se))
-        
-        return np.array(service_level_Sr)   
+   
             
     def cal_fill_rate(self, demand, result_record_dict):
         #对于每条路径的每个节点，计算在到达时刻的总库存是否能满足需求
@@ -635,16 +606,6 @@ class dual_sourcing:
             # service_level_Se.append(np.mean(t_service_level_Se))
         
         return np.array(service_level_Sr)
-    def save_order_records(self, result_record_dict, prefix="strategy"):
-        if "order_record_r" in result_record_dict:
-            np.savetxt(f"{prefix}_order_record_r.csv",
-                       result_record_dict["order_record_r"],
-                       delimiter=",", fmt="%.2f")
-        if "order_record_e" in result_record_dict:
-            np.savetxt(f"{prefix}_order_record_e.csv",
-                       result_record_dict["order_record_e"],
-                       delimiter=",", fmt="%.2f")
-        print(f"have saved {prefix} to CSV ")
             
 if __name__ == "__main__":
     # 设置参数
@@ -657,13 +618,12 @@ if __name__ == "__main__":
     b = c_e+h*(l_r+1)    # 缺货成本
     T = 30   # 时间周期数
     N = 500  # 模拟路径数量
-    service_level = 0.8 # 服务水平
+    service_level = 0.9  # 服务水平
     N_1=100
     
     # 生成需求数据 - 使用正态分布
-    distribution = ('norm', (100, 10)) 
-    mean = distribution[1][0] 
-    demand = sample_generation(distribution, (N, T), random_seed=33)
+    distribution = ('norm', (100, 10))  # 均值为10，标准差为10的正态分布
+    demand = sample_generation(distribution, (N, T), random_seed=36)
     sample= sample_generation(distribution, (N_1, 1000), random_seed=42)
     
     # 创建 dual_sourcing 实例
@@ -672,16 +632,13 @@ if __name__ == "__main__":
     print('only single source')
     single_source_result=ds.single_lost_sales(demand, S=None, inventory_level=0)
     print(single_source_result['average_total_cost'])
-    print(ds.cal_fill_rate_single(sample, single_source_result))
-    print(single_source_result['order_record_r'])
+    print(ds.cal_fill_rate(sample, single_source_result))
 
 
     print("DDI")
     ddi_result = ds.DDI_policy(demand, Se=None,D_2_constraint=True,inventory_level=0)
     print(ddi_result['average_total_cost'])
     print(ds.cal_fill_rate(sample, ddi_result))
-    print(ddi_result['order_record_r'])
-    print(ddi_result['order_record_e'])
 
     # print(ddi_result['order_record_regular'])
 
@@ -693,23 +650,12 @@ if __name__ == "__main__":
 
     #调用TBS策略
     print('TBS')
-    TBS_result=ds.TBS_policy(sample,demand,mean,x_init=None,q_init=None)
+    TBS_result=ds.TBS_policy(sample,demand,100,x_init=None,q_init=None)
     print(TBS_result['average_total_cost'])
-    print(ds.cal_fill_rate(sample, TBS_result))
-    print(TBS_result['order_record_r'])
-    print(TBS_result['order_record_e'])
 
 
 
     # # 调用DI策略
-    print('DI')
     di_cost = ds.DI_policy(demand, sample, x_init=None, q_init=None, inventory_level=0)
     print(di_cost['average_total_cost'])
-    print(ds.cal_fill_rate(sample, di_cost))
-    print(di_cost['order_record_r'])
-    print(di_cost['order_record_e'])
-
-    ds.save_order_records(single_source_result,"SingleSource")
-    ds.save_order_records(ddi_result, "DDI")
-    ds.save_order_records(TBS_result,"TBS")
-    ds.save_order_records(di_cost, "DI")
+    

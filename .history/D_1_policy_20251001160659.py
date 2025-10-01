@@ -635,16 +635,21 @@ class dual_sourcing:
             # service_level_Se.append(np.mean(t_service_level_Se))
         
         return np.array(service_level_Sr)
-    def save_order_records(self, result_record_dict, prefix="strategy"):
+    def save_order_records(result_record_dict, prefix="strategy"):
+        """
+        保存订货量到 csv 文件
+        :param result_record_dict: 策略返回的字典 (包含 'order_record_r' 和 'order_record_e')
+        :param prefix: 文件名前缀，比如 "DDI" / "TBS"
+        """
         if "order_record_r" in result_record_dict:
             np.savetxt(f"{prefix}_order_record_r.csv",
-                       result_record_dict["order_record_r"],
-                       delimiter=",", fmt="%.2f")
+                    result_record_dict["order_record_r"],
+                    delimiter=",", fmt="%.2f")
         if "order_record_e" in result_record_dict:
             np.savetxt(f"{prefix}_order_record_e.csv",
-                       result_record_dict["order_record_e"],
-                       delimiter=",", fmt="%.2f")
-        print(f"have saved {prefix} to CSV ")
+                    result_record_dict["order_record_e"],
+                    delimiter=",", fmt="%.2f")
+        print(f"已保存 {prefix} 的订货量到 CSV 文件")
             
 if __name__ == "__main__":
     # 设置参数
@@ -657,7 +662,7 @@ if __name__ == "__main__":
     b = c_e+h*(l_r+1)    # 缺货成本
     T = 30   # 时间周期数
     N = 500  # 模拟路径数量
-    service_level = 0.8 # 服务水平
+    service_level = 0.9  # 服务水平
     N_1=100
     
     # 生成需求数据 - 使用正态分布
@@ -709,7 +714,7 @@ if __name__ == "__main__":
     print(di_cost['order_record_r'])
     print(di_cost['order_record_e'])
 
-    ds.save_order_records(single_source_result,"SingleSource")
-    ds.save_order_records(ddi_result, "DDI")
-    ds.save_order_records(TBS_result,"TBS")
-    ds.save_order_records(di_cost, "DI")
+    ds.save_order_records(single_source_result, prefix="SingleSource")
+    ds.save_order_records(ddi_result, prefix="DDI")
+    ds.save_order_records(TBS_result, prefix="TBS")
+    save_order_records(di_cost, prefix="DI")
