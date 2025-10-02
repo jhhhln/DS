@@ -539,7 +539,7 @@ class dual_sourcing:
             'cost_per_period': cost_per_period,
             'total_cost_per_iteration': total_cost_per_iteration,
             'average_total_cost': average_total_cost,
-            'overshoot_record':overshoot_record
+            'overhshoot_record':overshoot_record
         }       
 
     def TBS_policy(self,sample,demand,mean,x_init=None,q_init=None):
@@ -630,7 +630,7 @@ class dual_sourcing:
 if __name__ == "__main__":
     # 设置参数
     c_r = 0    # 常规订单成本
-    c_e = 5   # 加急订单成本
+    c_e = 6   # 加急订单成本
     h = 1      # 库存持有成本
 
     l_r = 7 # 常规订单提前期
@@ -679,8 +679,5 @@ if __name__ == "__main__":
     print(benchmark_di_cost['average_total_cost'])
     print(ds.cal_fill_rate(sample, benchmark_di_cost))
 
-    print('cost driven TBS')
-    cost_driven_TBS_result=ds.cost_driven_TBS_policy(sample,demand,mean,x_init=None,q_init=None)
-    print(cost_driven_TBS_result['average_total_cost'])
-    print(ds.cal_fill_rate(sample, cost_driven_TBS_result))
+    
     

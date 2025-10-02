@@ -539,7 +539,7 @@ class dual_sourcing:
             'cost_per_period': cost_per_period,
             'total_cost_per_iteration': total_cost_per_iteration,
             'average_total_cost': average_total_cost,
-            'overshoot_record':overshoot_record
+            'overhshoot_record':overshoot_record
         }       
 
     def TBS_policy(self,sample,demand,mean,x_init=None,q_init=None):
@@ -586,7 +586,7 @@ class dual_sourcing:
 
         record_of_demand=self.cal_order_up_to(demand,optimal_Se,optimal_r,x_init,q_init,inventory_level=0,D_2_constraint=True)
         
-        return record_of_demand
+        return record_of
 
     def cal_fill_rate(self, demand, result_record_dict):
         #对于每条路径的每个节点，计算在到达时刻的总库存是否能满足需求
@@ -630,7 +630,7 @@ class dual_sourcing:
 if __name__ == "__main__":
     # 设置参数
     c_r = 0    # 常规订单成本
-    c_e = 5   # 加急订单成本
+    c_e = 6   # 加急订单成本
     h = 1      # 库存持有成本
 
     l_r = 7 # 常规订单提前期
@@ -678,9 +678,4 @@ if __name__ == "__main__":
     benchmark_di_cost = ds.benchmark_DI_policy(demand, sample, x_init=None, q_init=None, inventory_level=0)
     print(benchmark_di_cost['average_total_cost'])
     print(ds.cal_fill_rate(sample, benchmark_di_cost))
-
-    print('cost driven TBS')
-    cost_driven_TBS_result=ds.cost_driven_TBS_policy(sample,demand,mean,x_init=None,q_init=None)
-    print(cost_driven_TBS_result['average_total_cost'])
-    print(ds.cal_fill_rate(sample, cost_driven_TBS_result))
     
