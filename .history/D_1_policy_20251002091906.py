@@ -700,7 +700,7 @@ if __name__ == "__main__":
     # 生成需求数据 - 使用正态分布
     distribution = ('norm', (100, 10)) 
     mean = distribution[1][0] 
-    demand = sample_generation(distribution, (N, T), random_seed=30)
+    demand = sample_generation(distribution, (N, T), random_seed=33)
     sample= sample_generation(distribution, (N_1, 1000), random_seed=42)
     
     # 创建 dual_sourcing 实例
@@ -709,16 +709,16 @@ if __name__ == "__main__":
     print('only single source')
     single_source_result=ds.single_lost_sales(demand, S=None, inventory_level=0)
     print(single_source_result['average_total_cost'])
-    # print(ds.cal_fill_rate_single(sample, single_source_result))
-    # print(single_source_result['order_record_r'])
+    print(ds.cal_fill_rate_single(sample, single_source_result))
+    print(single_source_result['order_record_r'])
 
 
     print("DDI")
     ddi_result = ds.DDI_policy(demand, Se=None,D_2_constraint=True,inventory_level=0)
     print(ddi_result['average_total_cost'])
-    # print(ds.cal_fill_rate(sample, ddi_result))
-    # print(ddi_result['order_record_r'])
-    # print(ddi_result['order_record_e'])
+    print(ds.cal_fill_rate(sample, ddi_result))
+    print(ddi_result['order_record_r'])
+    print(ddi_result['order_record_e'])
 
     # print(ddi_result['order_record_regular'])
 
@@ -732,21 +732,20 @@ if __name__ == "__main__":
     print('TBS')
     TBS_result=ds.TBS_policy(sample,demand,mean,x_init=None,q_init=None)
     print(TBS_result['average_total_cost'])
-    # print(ds.cal_fill_rate(sample, TBS_result))
-    # print(TBS_result['order_record_r'])
-    # print(TBS_result['order_record_e'])
+    print(ds.cal_fill_rate(sample, TBS_result))
+    print(TBS_result['order_record_r'])
+    print(TBS_result['order_record_e'])
 
 
 
     # # 调用DI策略
     print('DI')
-    di_cost = ds.benchmark_DI_policy(demand,sample,x_init=None,q_init=None,inventory_level=0)
-    print(di_cost['average_total_cost'])
-    # print(ds.cal_fill_rate(sample, di_cost))
-    # print(di_cost['order_record_r'])
-    # print(di_cost['order_record_e'])
+    di_cost = ds.benchmark_DI_policy(self,demand,sample,x_init=None,q_init=None,inventory_level=0)
+    print(ds.cal_fill_rate(sample, di_cost))
+    print(di_cost['order_record_r'])
+    print(di_cost['order_record_e'])
 
-    # ds.save_order_records(single_source_result,"SingleSource")
-    # ds.save_order_records(ddi_result, "DDI")
-    # ds.save_order_records(TBS_result,"TBS")
-    # ds.save_order_records(di_cost, "DI")
+    ds.save_order_records(single_source_result,"SingleSource")
+    ds.save_order_records(ddi_result, "DDI")
+    ds.save_order_records(TBS_result,"TBS")
+    ds.save_order_records(di_cost, "DI")

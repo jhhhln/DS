@@ -329,7 +329,7 @@ class dual_sourcing:
         }       
 
 #含义是给定常规渠道和加急渠道的inventory position之后如何订货和每条路径的成本
-    def cal_order_up_to(self,demand,S_e,S_r,x_init,q_init,inventory_level=0,constraint_D1=False):
+    def cal_order_up_to(self,demand,S_e,S_r,x_init,q_init,inventory_level=0):
 
         iter_num = demand.shape[0]
         period_length = demand.shape[1]
@@ -363,12 +363,7 @@ class dual_sourcing:
                 IP_r=inv_level_record[:,[t]]+order_record_expe[:,t:t+self.l_e+1].sum(axis=1)[:,None]+order_record_regular[:,t:t+self.l_r].sum(axis=1)[:,None]
                 order_r=np.maximum(np.ones(IP_r.shape) * S_r - IP_r, 0)
                 order_record_regular=np.hstack((order_record_regular,order_r))
-                if constraint_D1:
-                    IP_r=inv_level_record[:,[t]]+order_record_expe[:,t:t+self.l_e+1].sum(axis=1)[:,None]\
-                    +order_record_regular[:,t:t+self.l_r+1].sum(axis=1)[:,None]
-                    order_r_add=np.maximum(self.Sr - IP_r, 0)
-                    order_record_regular[:, -1:] = order_record_regular[:, -1:] + order_r_add
-            
+
             y = inv_level_record[:, [t]] + order_record_regular[:, [t]]+order_record_expe[:,[t]]
             d=demand[:,[t]]
 
@@ -409,56 +404,24 @@ class dual_sourcing:
         }       
 
 
-    # def DI_policy(self,demand,sample,x_init=None,q_init=None,inventory_level=0):
-    #     #先找到delta的稳态分布，然后给出可能最优的组合（S_e,S_e+delta),在组合中搜索最优成本
-    #     #先利用sample path找到稳态分布
-    #     x_init=self.x_init_DDI if x_init is None else x_init
-    #     q_init=self.q_init if q_init is None else q_init
-
-    #     delta_range = np.arange(0, self.Sr, self.num_search_range)
-    #     #还是应该cost-driven下去搜索参数，然后
-    #     DI_cost_record =[]
-    #     for delta in delta_range:
-    #         record=self.cal_order_up_to(sample,self.Sr-delta,self.Sr,x_init,q_init,inventory_level=0)
-    #         cost=record['average_total_cost']
-    #         DI_cost_record.append(cost)
-    #     min_cost_idx = np.argmin(DI_cost_record)
-    #     optimal_delta = delta_range[min_cost_idx]
-    #     record_of_demand=self.cal_order_up_to(demand,self.Sr-optimal_delta,self.Sr,x_init,q_init,inventory_level=0)
-    #     return record_of_demand
-
-    def benchmark_DI_policy(self,demand,sample,x_init=None,q_init=None,inventory_level=0):
-        #先找到delta的稳态分布，然后给出可能最优的组合（S,S+delta),在组合中搜索最优成本
+    def DI_policy(self,demand,sample,x_init=None,q_init=None,inventory_level=0):
+        #先找到delta的稳态分布，然后给出可能最优的组合（S_e,S_e+delta),在组合中搜索最优成本
         #先利用sample path找到稳态分布
-        x_init=self.x_init_SDI if x_init is None else x_init
+        x_init=self.x_init_DDI if x_init is None else x_init
         q_init=self.q_init if q_init is None else q_init
 
-        delta_range = np.arange(0, self.Se, self.Se/self.num_search_range)
-
+        delta_range = np.arange(0, self.Sr, self.num_search_range)
+        #还是应该ccost-driven下
         DI_cost_record =[]
-        best_Se_record=[]
         for delta in delta_range:
-            record=self.cal_order_up_to(sample,self.Se,delta+self.Se,x_init,q_init,inventory_level=0,constraint_D1=False)
-            overshoot_record=record['overshoot_record'] 
-            #计算最优的Se
-            variable = sample.cumsum(axis=1)[:, self.l_e][:, None]
-            variable = np.tile(variable, (1, 50))
-            best_Se = np.quantile(
-                variable - overshoot_record[:, -50:], 
-                self.b / (self.b + self.h))
-
-            result = self.cal_order_up_to(
-                sample, best_Se, delta+best_Se, x_init, q_init,
-                inventory_level=0, constraint_D1=False)
-            cost = result['average_total_cost']
+            record=self.cal_order_up_to(sample,self.Sr-delta,self.Sr,x_init,q_init,inventory_level=0)
+            cost=record['average_total_cost']
             DI_cost_record.append(cost)
-            best_Se_record.append(best_Se)
-
         min_cost_idx = np.argmin(DI_cost_record)
         optimal_delta = delta_range[min_cost_idx]
-        optimal_Se = best_Se_record[min_cost_idx]
-
-        record_of_demand=self.cal_order_up_to(demand,optimal_Se,optimal_Se+optimal_delta,x_init,q_init,inventory_level=0,constraint_D1=True)
+        print(f"最优delta: {optimal_delta}, 最优成本: {DI_cost_record[min_cost_idx]}")
+        print(f"对应的(S_e,S_r): ({self.Sr-optimal_delta},{self.Sr})")
+        record_of_demand=self.cal_order_up_to(demand,self.Sr-optimal_delta,self.Sr,x_init,q_init,inventory_level=0)
         return record_of_demand
 #TBS策略中加急渠道是order_up_to,常规渠道是r
     def cal_order_up_to_with_r(self,demand,S_e,r,x_init,q_init,inventory_level=0,constraint_D1=False):
@@ -700,7 +663,7 @@ if __name__ == "__main__":
     # 生成需求数据 - 使用正态分布
     distribution = ('norm', (100, 10)) 
     mean = distribution[1][0] 
-    demand = sample_generation(distribution, (N, T), random_seed=30)
+    demand = sample_generation(distribution, (N, T), random_seed=33)
     sample= sample_generation(distribution, (N_1, 1000), random_seed=42)
     
     # 创建 dual_sourcing 实例
@@ -709,16 +672,16 @@ if __name__ == "__main__":
     print('only single source')
     single_source_result=ds.single_lost_sales(demand, S=None, inventory_level=0)
     print(single_source_result['average_total_cost'])
-    # print(ds.cal_fill_rate_single(sample, single_source_result))
-    # print(single_source_result['order_record_r'])
+    print(ds.cal_fill_rate_single(sample, single_source_result))
+    print(single_source_result['order_record_r'])
 
 
     print("DDI")
     ddi_result = ds.DDI_policy(demand, Se=None,D_2_constraint=True,inventory_level=0)
     print(ddi_result['average_total_cost'])
-    # print(ds.cal_fill_rate(sample, ddi_result))
-    # print(ddi_result['order_record_r'])
-    # print(ddi_result['order_record_e'])
+    print(ds.cal_fill_rate(sample, ddi_result))
+    print(ddi_result['order_record_r'])
+    print(ddi_result['order_record_e'])
 
     # print(ddi_result['order_record_regular'])
 
@@ -732,21 +695,21 @@ if __name__ == "__main__":
     print('TBS')
     TBS_result=ds.TBS_policy(sample,demand,mean,x_init=None,q_init=None)
     print(TBS_result['average_total_cost'])
-    # print(ds.cal_fill_rate(sample, TBS_result))
-    # print(TBS_result['order_record_r'])
-    # print(TBS_result['order_record_e'])
+    print(ds.cal_fill_rate(sample, TBS_result))
+    print(TBS_result['order_record_r'])
+    print(TBS_result['order_record_e'])
 
 
 
     # # 调用DI策略
     print('DI')
-    di_cost = ds.benchmark_DI_policy(demand,sample,x_init=None,q_init=None,inventory_level=0)
+    di_cost = ds.DI_policy(demand, sample, x_init=None, q_init=None, inventory_level=0)
     print(di_cost['average_total_cost'])
-    # print(ds.cal_fill_rate(sample, di_cost))
-    # print(di_cost['order_record_r'])
-    # print(di_cost['order_record_e'])
+    print(ds.cal_fill_rate(sample, di_cost))
+    print(di_cost['order_record_r'])
+    print(di_cost['order_record_e'])
 
-    # ds.save_order_records(single_source_result,"SingleSource")
-    # ds.save_order_records(ddi_result, "DDI")
-    # ds.save_order_records(TBS_result,"TBS")
-    # ds.save_order_records(di_cost, "DI")
+    ds.save_order_records(single_source_result,"SingleSource")
+    ds.save_order_records(ddi_result, "DDI")
+    ds.save_order_records(TBS_result,"TBS")
+    ds.save_order_records(di_cost, "DI")

@@ -742,9 +742,9 @@ if __name__ == "__main__":
     print('DI')
     di_cost = ds.benchmark_DI_policy(demand,sample,x_init=None,q_init=None,inventory_level=0)
     print(di_cost['average_total_cost'])
-    # print(ds.cal_fill_rate(sample, di_cost))
-    # print(di_cost['order_record_r'])
-    # print(di_cost['order_record_e'])
+    print(ds.cal_fill_rate(sample, di_cost))
+    print(di_cost['order_record_r'])
+    print(di_cost['order_record_e'])
 
     # ds.save_order_records(single_source_result,"SingleSource")
     # ds.save_order_records(ddi_result, "DDI")
