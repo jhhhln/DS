@@ -278,7 +278,7 @@ class dual_sourcing:
         for t in range(period_length):
             if order_record_expe.shape[1] < period_length:
                 # 确保索引不越界
-                IP_e=inv_level_record[:,[t]]+order_record_expe[:,t:t+self.l_e].sum(axis=1)[:,None]+order_record_regular[:,t:t+self.l_e+1].sum(axis=1)[:,None]
+                IP_e=inv_level_record[:,[t]]+order_record_expe[:,t:t+self.l_e].sum(axis=1)[:,None]+order_record_regular[:,t:t+self.l_e].sum(axis=1)[:,None]
                 order_e=np.maximum(np.ones(IP_e.shape) * self.Se - IP_e, 0)
                 order_record_expe=np.hstack((order_record_expe,order_e))
             
@@ -352,7 +352,7 @@ class dual_sourcing:
                 # 确保索引不越界
                 end_idx = min(t + self.l_e, order_record_expe.shape[1])
 
-                IP_e=inv_level_record[:,[t]]+order_record_expe[:,t:t+self.l_e].sum(axis=1)[:,None]+order_record_regular[:,t:t+self.l_e+1].sum(axis=1)[:,None]
+                IP_e=inv_level_record[:,[t]]+order_record_expe[:,t:t+self.l_e].sum(axis=1)[:,None]+order_record_regular[:,t:t+self.l_e].sum(axis=1)[:,None]
                 order_e=np.maximum(np.ones(IP_e.shape) * S_e - IP_e, 0)
                 order_record_expe=np.hstack((order_record_expe,order_e))
                 overshoot=np.maximum(IP_e-np.ones(IP_e.shape) * S_e, 0)
@@ -432,7 +432,7 @@ class dual_sourcing:
     def benchmark_DI_policy(self,demand,sample,x_init=None,q_init=None,inventory_level=0):
         #先找到delta的稳态分布，然后给出可能最优的组合（S,S+delta),在组合中搜索最优成本
         #先利用sample path找到稳态分布
-        x_init=self.x_init_DDI if x_init is None else x_init
+        x_init=self.x_init_SDI if x_init is None else x_init
         q_init=self.q_init if q_init is None else q_init
 
         delta_range = np.arange(0, self.Se, self.Se/self.num_search_range)
@@ -488,7 +488,7 @@ class dual_sourcing:
                 # 确保索引不越界
                 end_idx = min(t + self.l_e, order_record_expe.shape[1])
                 ###
-                IP_e=inv_level_record[:,[t]]+order_record_expe[:,t:t+self.l_e].sum(axis=1)[:,None]+order_record_regular[:,t:t+self.l_e+1].sum(axis=1)[:,None]
+                IP_e=inv_level_record[:,[t]]+order_record_expe[:,t:t+self.l_e].sum(axis=1)[:,None]+order_record_regular[:,t:t+self.l_e].sum(axis=1)[:,None]
                 ###
                 order_e=np.maximum(np.ones(IP_e.shape) * S_e - IP_e, 0)
                 order_record_expe=np.hstack((order_record_expe,order_e))
@@ -692,10 +692,10 @@ class dual_sourcing:
 if __name__ == "__main__":
     # 设置参数
     c_r = 1    # 常规订单成本
-    c_e = 3  # 加急订单成本
+    c_e = 4  # 加急订单成本
     h = 1      # 库存持有成本
 
-    l_r = 15  # 常规订单提前期
+    l_r = 5  # 常规订单提前期
     l_e = 1    # 加急订单提前期
     b = c_e+h*(l_r+1)    # 缺货成本
     T = 60  # 时间周期数
@@ -751,11 +751,3 @@ if __name__ == "__main__":
     print('DI')
     di_cost = ds.benchmark_DI_policy(demand,sample,x_init=None,q_init=None,inventory_level=0)
     print(di_cost['average_total_cost'])
-    # print(ds.cal_fill_rate(sample, di_cost))
-    # print(di_cost['order_record_r'])
-    # print(di_cost['order_record_e'])
-
-    # ds.save_order_records(single_source_result,"SingleSource")
-    # ds.save_order_records(ddi_result, "DDI")
-    # ds.save_order_records(TBS_result,"TBS")
-    # ds.save_order_records(di_cost, "DI")

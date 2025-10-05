@@ -278,14 +278,16 @@ class dual_sourcing:
         for t in range(period_length):
             if order_record_expe.shape[1] < period_length:
                 # 确保索引不越界
-                IP_e=inv_level_record[:,[t]]+order_record_expe[:,t:t+self.l_e].sum(axis=1)[:,None]+order_record_regular[:,t:t+self.l_e+1].sum(axis=1)[:,None]
+                IP_e=inv_level_record[:,[t]]+order_record_expe[:,t:t+self.l_e].sum(axis=1)[:,None]
+                +order_record_regular[:,t:t+self.l_e+1].sum(axis=1)[:,None]
                 order_e=np.maximum(np.ones(IP_e.shape) * self.Se - IP_e, 0)
                 order_record_expe=np.hstack((order_record_expe,order_e))
             
             if order_record_regular.shape[1] < period_length:
                 # 确保索引不越界
                 end_idx = min(t + self.l_r, order_record_regular.shape[1])
-                IP_r=inv_level_record[:,[t]]+order_record_expe[:,t:t+self.l_e+1].sum(axis=1)[:,None]+order_record_regular[:,t:t+self.l_r].sum(axis=1)[:,None]
+                IP_r=inv_level_record[:,[t]]+order_record_expe[:,t:t+self.l_e+1].sum(axis=1)[:,None]
+                +order_record_regular[:,t:t+self.l_r].sum(axis=1)[:,None]
                 order_r=np.maximum(np.ones(IP_r.shape) * (self.Se+self.S_l) - IP_r, 0)
                 order_record_regular=np.hstack((order_record_regular,order_r))
 
@@ -368,8 +370,7 @@ class dual_sourcing:
                     IP_r=inv_level_record[:,[t]]+order_record_expe[:,t:t+self.l_e+1].sum(axis=1)[:,None]\
                     +order_record_regular[:,t:t+self.l_r+1].sum(axis=1)[:,None]
                     order_r_add=np.maximum(self.Sr - IP_r, 0)
-                    # order_record_regular[:, -1:] = order_record_regular[:, -1:] + order_r_add
-                    order_record_regular[:, -1:]  += order_r_add
+                    order_record_regular[:, -1:] = order_record_regular[:, -1:] + order_r_add
             
             y = inv_level_record[:, [t]] + order_record_regular[:, [t]]+order_record_expe[:,[t]]
             d=demand[:,[t]]
@@ -432,7 +433,7 @@ class dual_sourcing:
     def benchmark_DI_policy(self,demand,sample,x_init=None,q_init=None,inventory_level=0):
         #先找到delta的稳态分布，然后给出可能最优的组合（S,S+delta),在组合中搜索最优成本
         #先利用sample path找到稳态分布
-        x_init=self.x_init_DDI if x_init is None else x_init
+        x_init=self.x_init_SDI if x_init is None else x_init
         q_init=self.q_init if q_init is None else q_init
 
         delta_range = np.arange(0, self.Se, self.Se/self.num_search_range)
@@ -692,10 +693,10 @@ class dual_sourcing:
 if __name__ == "__main__":
     # 设置参数
     c_r = 1    # 常规订单成本
-    c_e = 3  # 加急订单成本
+    c_e = 4  # 加急订单成本
     h = 1      # 库存持有成本
 
-    l_r = 15  # 常规订单提前期
+    l_r = 5  # 常规订单提前期
     l_e = 1    # 加急订单提前期
     b = c_e+h*(l_r+1)    # 缺货成本
     T = 60  # 时间周期数
@@ -708,9 +709,8 @@ if __name__ == "__main__":
     distribution = ('norm', (50, 100)) 
     mean = distribution[1][0] 
     demand = sample_generation(distribution, (N, T), random_seed=random_seed1)
-    demand[demand < 0] = 0  # 确保需求非负
+    sample[sample > sample_mean + 3 * sample_dev] = sample_mean + 3 * sample_dev
     sample= sample_generation(distribution, (N_1, 1000), random_seed=random_seed2)
-    sample[sample < 0] = 0  # 确保需求非负
     
     # 创建 dual_sourcing 实例
     ds = dual_sourcing(c_r, c_e, h, b, l_r, l_e, demand, service_level)

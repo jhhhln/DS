@@ -369,7 +369,7 @@ class dual_sourcing:
                     +order_record_regular[:,t:t+self.l_r+1].sum(axis=1)[:,None]
                     order_r_add=np.maximum(self.Sr - IP_r, 0)
                     # order_record_regular[:, -1:] = order_record_regular[:, -1:] + order_r_add
-                    order_record_regular[:, -1:]  += order_r_add
+                    order_record_regular[:, -1:]  + order_r_add
             
             y = inv_level_record[:, [t]] + order_record_regular[:, [t]]+order_record_expe[:,[t]]
             d=demand[:,[t]]
@@ -432,7 +432,7 @@ class dual_sourcing:
     def benchmark_DI_policy(self,demand,sample,x_init=None,q_init=None,inventory_level=0):
         #先找到delta的稳态分布，然后给出可能最优的组合（S,S+delta),在组合中搜索最优成本
         #先利用sample path找到稳态分布
-        x_init=self.x_init_DDI if x_init is None else x_init
+        x_init=self.x_init_SDI if x_init is None else x_init
         q_init=self.q_init if q_init is None else q_init
 
         delta_range = np.arange(0, self.Se, self.Se/self.num_search_range)
@@ -692,10 +692,10 @@ class dual_sourcing:
 if __name__ == "__main__":
     # 设置参数
     c_r = 1    # 常规订单成本
-    c_e = 3  # 加急订单成本
+    c_e = 4  # 加急订单成本
     h = 1      # 库存持有成本
 
-    l_r = 15  # 常规订单提前期
+    l_r = 5  # 常规订单提前期
     l_e = 1    # 加急订单提前期
     b = c_e+h*(l_r+1)    # 缺货成本
     T = 60  # 时间周期数
