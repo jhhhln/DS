@@ -781,8 +781,7 @@ if __name__ == "__main__":
     l_r_list = [2, 3, 5, 10]
     l_e_list = [1, 2, 3]
     service_level_list = [0.95, 0.975, 0.99]
-    # distributions = [("norm", (100, 10)), ("geom", (0.4)), ("binom", (100, 0.5))]
-    distributions = [("norm", (100, 10))]
+    distributions = [("norm", (100, 10)), ("geom", (0.4)), ("binom", (100, 0.5))]
 
     results = []
 
@@ -828,6 +827,8 @@ if __name__ == "__main__":
                     "l_e": l_e,
                     "service_level": service_level,
                     "seed_id": seed_id,
+                    'random_seed1': random_seed1,
+                    'random_seed2': random_seed2,
                     "b": b,
                     "single_cost": single_result['average_total_cost'],
                     "DDI_cost": ddi_result['average_total_cost'],

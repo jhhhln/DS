@@ -781,8 +781,7 @@ if __name__ == "__main__":
     l_r_list = [2, 3, 5, 10]
     l_e_list = [1, 2, 3]
     service_level_list = [0.95, 0.975, 0.99]
-    # distributions = [("norm", (100, 10)), ("geom", (0.4)), ("binom", (100, 0.5))]
-    distributions = [("norm", (100, 10))]
+    distributions = [("norm", (100, 10)), ("geom", (0.4)), ("binom", (100, 0.5))]
 
     results = []
 
@@ -792,9 +791,7 @@ if __name__ == "__main__":
             continue
 
         b = c_e + h * (l_r + 1)
-        if b/(b+h)>=service_level:  # 跳过不符合条件的组合
-            continue
-
+        
         if dist[0]=='norm':
             mean=100
         elif dist[0]=='geom':

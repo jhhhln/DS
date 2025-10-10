@@ -781,26 +781,17 @@ if __name__ == "__main__":
     l_r_list = [2, 3, 5, 10]
     l_e_list = [1, 2, 3]
     service_level_list = [0.95, 0.975, 0.99]
-    # distributions = [("norm", (100, 10)), ("geom", (0.4)), ("binom", (100, 0.5))]
-    distributions = [("norm", (100, 10))]
+    distributions = [("norm", (100, 10)), ("geom", (0.4)), ("binom", (100, 0.5))]
 
     results = []
 
     # 遍历所有组合
     for dist, c_e, l_r, l_e, service_level in itertools.product(distributions, c_e_list, l_r_list, l_e_list, service_level_list):
-        if l_e >= l_r:  # 跳过不符合条件的组合
+        if l_e > l_r:  # 跳过不符合条件的组合
             continue
 
         b = c_e + h * (l_r + 1)
-        if b/(b+h)>=service_level:  # 跳过不符合条件的组合
-            continue
-
-        if dist[0]=='norm':
-            mean=100
-        elif dist[0]=='geom':
-            mean=2.5
-        elif dist[0]=='binom':
-            mean=50
+        mean = dist[1][0] if dist[0] == "norm" else 100  # 平均值估计（按分布调整）
 
         for seed_id in range(10):  # 10个随机种子测试稳定性
             random_seed1 = np.random.randint(10000)

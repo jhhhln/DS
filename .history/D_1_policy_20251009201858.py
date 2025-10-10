@@ -782,7 +782,7 @@ if __name__ == "__main__":
     l_e_list = [1, 2, 3]
     service_level_list = [0.95, 0.975, 0.99]
     # distributions = [("norm", (100, 10)), ("geom", (0.4)), ("binom", (100, 0.5))]
-    distributions = [("norm", (100, 10))]
+    distributions = [("norm", (100, 10)), ("geom", (0.4)), ("binom", (100, 0.5))]
 
     results = []
 
