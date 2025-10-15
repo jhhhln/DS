@@ -2,10 +2,10 @@ import numpy as np
 from demand import sample_generation
 import itertools
 import pandas as pd
-
+from tqdm import tqdm
 
 class dual_sourcing:
-    def __init__(self, c_r, c_e, h, b, l_r, l_e, demand, service_level):
+    def __init__(self, c_r, c_e, h, b, l_r, l_e, T, sample, service_level):
         #成本参数
         self.c_r = c_r
         self.c_e = c_e
@@ -16,272 +16,150 @@ class dual_sourcing:
         self.l=self.l_r-self.l_e
         #给定的服务水平alpha
         self.service_level = service_level
+        self.T = T
 
         # 输入需求 [N, T] 其中列数代表一条路径的总周期，行数代表路径的总条数，用demand得到的cost作比较
-        self.demand = demand
-        self.mean=self.demand.mean()
-        #对数组的需求向右累加求和 每一列代表k个D的可能的取值，之后对每一列分别取分位数
-        self.cum_demand = self.demand.cumsum(axis=1)
-
-        # S_1,…,S_{l_r+1}
+        self.sample = sample
+        self.mean = self.sample.mean()
         self.S_service_level = self.cum_demand_quantile()
 
-        # 加急初始订单
+        # # 加急初始订单
         self.q_init = np.zeros(self.l_e)
-
-        # 常规初始订单 lost_sales和DDI
-        self.x_init_DDI = np.diff(np.insert(self.S_service_level, 0, 0))[:self.l_r]
-
-
-        # init x for SDI
-        #前l_e+1项
-        self.x_init_SDI=np.diff(np.insert(self.S_service_level, 0, 0))[:self.l_e+1]
-        #第l_e+2到第l_r项
-        S_l=[]
-        for i in range(self.l-1):
-            S_l.append(self.Sl(0, self.c_e - self.c_r + self.l*self.h, 
-                            self.h, self.b , i+1, 1-self.service_level))     
-        x_init_SDI_add=np.diff(np.insert(S_l,0,0))[:self.l-1]
-        self.x_init_SDI = np.concatenate((self.x_init_SDI,x_init_SDI_add))
+        self.x_init = np.diff(np.insert(self.S_service_level, 0, 0))[:self.l_e+1]
+        self.x_init = np.concatenate((self.x_init,
+                                      np.ones(self.l_r - self.l_e - 1) * self.mean))
 
         self.Se=self.S_service_level[self.l_e]
-        print(self.Se)
         self.Sr=self.S_service_level[self.l_r]
-        print(self.Sr)
-        self.S_l=self.Sl(0, self.c_e - self.c_r + self.l *self.h, self.h, self.b, self.l, 1-self.service_level)
-        print(self.S_l)
-        
         self.num_search_range=100
 
 
-#计算S1,到S_(l_r+1)
+    #计算S1,到S_(l_r+1)
     def cum_demand_quantile(self):
         #对需求数组先向右求和，然后对每一列分别取分位数，序号为k取的是(k+1)个D的情况
-        q_all = np.quantile(self.cum_demand,
-                            q=self.service_level,
-                            axis=0)  
-        return q_all[:self.l_r + 1]
-
-#计算S_l函数
-    def Sl(self,c1,c2,h,b,l,alpha):
-        quantile = (b*alpha + c2 - c1) / (h*(1-alpha) + b*alpha + c2 - c1)
-        return np.quantile(self.cum_demand[:,l-1], quantile)
+        q_all = np.quantile(self.sample.cumsum(axis=1), q=self.service_level, axis=0)  
+        return q_all[:self.l_r + 1] 
 
 
-    def single_cource(self, demand):
+    def cal_cost(self, order_record_r, order_record_e,  inv_level_record):
+        period_cost = self.c_r * order_record_r \
+            + self.c_e * order_record_e \
+            + self.h * np.maximum(inv_level_record[:,1:], 0) \
+            + self.b * np.maximum(-inv_level_record[:,1:], 0)
+        average_total_cost = period_cost.sum(axis=1).mean()
+        return period_cost, average_total_cost
+    
+
+    def single_source(self, demand):
         iter_num = demand.shape[0]
         period_length = demand.shape[1]
-        order_record_regular = np.diff(np.insert(self.S_service_level, 0, 0))[:self.l_e+1]
-        order_record_regular = np.concatenate((order_record_regular,
-                                               np.ones(self.l_r - self.l_e - 1) * 100))
-        order_record_regular = np.tile(order_record_regular,(iter_num,1))
-        cost_per_period = np.zeros((iter_num, 0)) 
-        S_r = self.Se + (self.l_r - self.l_e) * 100
-        inv_level_record = np.zeros((iter_num, 1))
 
+        #定义双源系统两个渠道的订货量
+        order_record_regular=np.tile(self.x_init,(iter_num,1))
+        order_record_expe=np.tile(self.q_init,(iter_num,1))
+
+        # 初始化记录数组
+        inv_level_record = np.zeros((iter_num, 1))
+        S_r = self.Se + (self.l_r - self.l_e) * self.mean
+    
         for t in range(period_length):
             IP_r = inv_level_record[:,[t]] + order_record_regular[:,t:t+self.l_r].sum(axis=1)[:,None]
             order_r = np.maximum(np.ones(IP_r.shape) * S_r - IP_r, 0)
             order_record_regular = np.hstack((order_record_regular,order_r))
 
-            y = inv_level_record[:, [t]] + order_record_regular[:, [t]]
-            d = demand[:, [t]]
-            next_inv_level = y - d 
+            IP_e = inv_level_record[:,[t]] \
+                + order_record_regular[:,t : t+self.l_e+1].sum(axis=1)[:,None] \
+                + order_record_expe[:,t : t+self.l_e].sum(axis=1)[:,None]
+            order_e = np.maximum(np.ones(IP_e.shape) * self.Se - IP_e, 0)
+            order_record_expe = np.hstack((order_record_expe, order_e))
 
-            # 计算当前周期的成本
-            period_cost = (
-                self.c_r * order_record_regular[:, [t]]
-                + self.h * np.maximum(next_inv_level, 0)
-                + self.b * np.maximum(-next_inv_level, 0))
-
-            # 将当前周期的成本添加到成本记录中
-            cost_per_period = np.hstack((cost_per_period, period_cost))
-            
-            # 使用 hstack 添加列
+            next_inv_level = inv_level_record[:, [t]] + order_record_regular[:, [t]] - demand[:, [t]]
             inv_level_record = np.hstack((inv_level_record, next_inv_level))
-            
-        # 计算每个迭代（行）的总成本
-        total_cost_per_iteration = np.sum(cost_per_period, axis=1)
-        average_total_cost = np.mean(total_cost_per_iteration)
-
-        return {
-            'order_record_r': order_record_regular,
-            'inv_level_record': inv_level_record,
-            'cost_per_period': cost_per_period,
-            'total_cost_per_iteration': total_cost_per_iteration,
-            'average_total_cost': average_total_cost
-        } 
-
-
-    def SDI_policy(self,demand,inventory_level=0):
-
-        iter_num = demand.shape[0]
-        period_length = demand.shape[1]
-
-        #定义双源系统两个渠道的订货量
-        x_init=np.tile(self.x_init_SDI,(iter_num,1))
-        q_init=np.tile(self.q_init,(iter_num,1))
-        #记录两个渠道的订货量
-        order_record_regular = x_init.copy()
-        order_record_expe=q_init.copy()
-
-        # 初始化记录数组
-        inv_level_record = np.ones((iter_num, 1)) * inventory_level
-        cost_per_period = np.zeros((iter_num, 0)) 
-        y_level_record = np.zeros((iter_num, 1))
-        
-        for t in range(period_length):
-            if order_record_expe.shape[1] < period_length:
-                # 确保索引不越界
-                IP_e=inv_level_record[:,[t]]+order_record_expe[:,t:t+self.l_e].sum(axis=1)[:,None]+order_record_regular[:,t:t+self.l_e+1].sum(axis=1)[:,None]
-                order_e=np.maximum(np.ones(IP_e.shape) * self.Se - IP_e, 0)
-                order_record_expe=np.hstack((order_record_expe,order_e))
-            
-            if order_record_regular.shape[1] < period_length:
-                # 确保索引不越界
-                end_idx = min(t + self.l_r, order_record_regular.shape[1])
-                IP_r=inv_level_record[:,[t]]+order_record_expe[:,t:t+self.l_e+1].sum(axis=1)[:,None]+order_record_regular[:,t:t+self.l_r].sum(axis=1)[:,None]
-                order_r=np.maximum(np.ones(IP_r.shape) * (self.Se+self.S_l) - IP_r, 0)
-                order_record_regular=np.hstack((order_record_regular,order_r))
-
-            y = inv_level_record[:, [t]] + order_record_regular[:, [t]]+order_record_expe[:,[t]]
-            d=demand[:,[t]]
-
-            # 计算当前周期的成本
-            period_cost = (
-                self.c_r * order_record_regular[:, [t]]+self.c_e * order_record_expe[:, [t]]+ self.h * np.maximum(y - d, 0)+ self.b * np.maximum(d - y, 0))
-
-            
-            # 将当前周期的成本添加到成本记录中
-            cost_per_period = np.hstack((cost_per_period, period_cost))
-
-
-            # 计算下一期的库存水平
-            next_inv_level = y - d
-
-            
-            # 使用 hstack 添加列
-            inv_level_record = np.hstack((inv_level_record, next_inv_level))
-            y_level_record = np.hstack((y_level_record, y))
-
-
-        # 计算每个迭代（行）的总成本
-        total_cost_per_iteration = np.sum(cost_per_period, axis=1)
-        average_total_cost = np.mean(total_cost_per_iteration)
-
+        period_cost, average_total_cost = self.cal_cost(order_r, np.zeros((iter_num, period_length)),  inv_level_record)
 
         return {
             'order_record_r': order_record_regular,
             'order_record_e': order_record_expe,
             'inv_level_record': inv_level_record,
-            'y_level_record': y_level_record,
-            'cost_per_period': cost_per_period,
-            'total_cost_per_iteration': total_cost_per_iteration,
+            'period_cost': period_cost,
             'average_total_cost': average_total_cost
-        }       
+        }
 
-#含义是给定常规渠道和加急渠道的inventory position之后如何订货和每条路径的成本
-    def cal_order_up_to(self,demand,S_e,S_r,x_init,q_init,inventory_level=0,D_2_constraint=False):
 
+    # 含义是给定常规渠道和加急渠道的inventory position之后如何订货和每条路径的成本
+    def cal_order_up_to(self, demand, S_e, S_r,
+                        x_init, q_init,
+                        constraint_D2=False):
         iter_num = demand.shape[0]
         period_length = demand.shape[1]
 
         #定义双源系统两个渠道的订货量
-        x_init=np.tile(x_init,(iter_num,1))
-        q_init=np.tile(q_init,(iter_num,1))
-        #记录两个渠道的订货量
-        order_record_regular = x_init.copy()
-        order_record_expe=q_init.copy()
+        order_record_regular=np.tile(x_init,(iter_num,1))
+        order_record_expe=np.tile(q_init,(iter_num,1))
 
         # 初始化记录数组
-        inv_level_record = np.ones((iter_num, 1)) * inventory_level
-        cost_per_period = np.zeros((iter_num, 0)) 
-        y_level_record = np.zeros((iter_num, 1))
+        inv_level_record = np.zeros((iter_num, 1))
         overshoot_record=np.zeros((iter_num, 1))
 
         for t in range(period_length):
             if order_record_expe.shape[1] < period_length:
-                IP_e=inv_level_record[:,[t]]+order_record_expe[:,t:t+self.l_e].sum(axis=1)[:,None]+order_record_regular[:,t:t+self.l_e+1].sum(axis=1)[:,None]
+                IP_e = inv_level_record[:,[t]] + order_record_expe[:,t:t+self.l_e].sum(axis=1)[:,None] \
+                    + order_record_regular[:,t:t+self.l_e+1].sum(axis=1)[:,None]
                 order_e=np.maximum(np.ones(IP_e.shape) * S_e - IP_e, 0)
+                if constraint_D2:
+                    order_e=np.maximum(np.ones(IP_e.shape) * self.Se - IP_e, 0)
                 order_record_expe=np.hstack((order_record_expe,order_e))
                 overshoot=np.maximum(IP_e-np.ones(IP_e.shape) * S_e, 0)
                 overshoot_record=np.hstack((overshoot_record,overshoot))
             
             if order_record_regular.shape[1] < period_length:
-                # 确保索引不越界
-                end_idx = min(t + self.l_r, order_record_regular.shape[1])
-                IP_r=inv_level_record[:,[t]]+order_record_expe[:,t:t+self.l_e+1].sum(axis=1)[:,None]+order_record_regular[:,t:t+self.l_r].sum(axis=1)[:,None]
+                IP_r = inv_level_record[:,[t]] + order_record_expe[:,t:t+self.l_e+1].sum(axis=1)[:,None] \
+                    + order_record_regular[:,t:t+self.l_r].sum(axis=1)[:,None]
                 order_r=np.maximum(np.ones(IP_r.shape) * S_r - IP_r, 0)
                 order_record_regular=np.hstack((order_record_regular,order_r))
 
-            if D_2_constraint:
-                IP_e=inv_level_record[:,[t]]+order_record_expe[:,t:t+self.l_e+1].sum(axis=1)[:,None]+order_record_regular[:,t:t+self.l_e+1].sum(axis=1)[:,None]
-                order_e_add=np.maximum(np.ones(IP_e.shape) * self.Se - IP_e, 0)
-                order_record_expe[:, -1:] = order_record_expe[:, -1:] + order_e_add
-
-            y = inv_level_record[:, [t]] + order_record_regular[:, [t]]+order_record_expe[:,[t]]
-            d=demand[:,[t]]
-
-            # 计算当前周期的成本
-            period_cost = (
-                self.c_r * order_record_regular[:, [t]]+self.c_e * order_record_expe[:, [t]]+ self.h * np.maximum(y - d, 0)+ self.b * np.maximum(d - y, 0))
-
-            
-            # 将当前周期的成本添加到成本记录中
-            cost_per_period = np.hstack((cost_per_period, period_cost))
-
-
-            # 计算下一期的库存水平
-            next_inv_level = y - d
-
-            
-            # 使用 hstack 添加列
+            next_inv_level = inv_level_record[:, [t]] + order_record_regular[:, [t]] \
+                + order_record_expe[:,[t]] - demand[:, [t]]
             inv_level_record = np.hstack((inv_level_record, next_inv_level))
-            y_level_record = np.hstack((y_level_record, y))
-
-
-        # 计算每个迭代（行）的总成本
-        total_cost_per_iteration = np.sum(cost_per_period, axis=1)
-        average_total_cost = np.mean(total_cost_per_iteration)
+        period_cost, average_total_cost = self.cal_cost(order_record_regular, order_record_expe,  inv_level_record)
 
         return {
             'order_record_r': order_record_regular,
             'order_record_e': order_record_expe,
             'inv_level_record': inv_level_record,
-            'y_level_record': y_level_record,
-            'cost_per_period': cost_per_period,
-            'total_cost_per_iteration': total_cost_per_iteration,
+            'period_cost': period_cost,
             'average_total_cost': average_total_cost,
             'overshoot_record':overshoot_record
-        }       
+        }        
 
 
-    def DI_policy(self,demand,sample,x_init=None,q_init=None,inventory_level=0):
+    def constrained_DI_policy(self, demand, sample, x_init=None,q_init=None):
         #先找到delta的稳态分布，然后给出可能最优的组合（S,S+delta),在组合中搜索最优成本
         #先利用sample path找到稳态分布
-        x_init=self.x_init_SDI if x_init is None else x_init
+        x_init=self.x_init if x_init is None else x_init
         q_init=self.q_init if q_init is None else q_init
 
-        delta_range = np.arange(0, self.Sr, self.Sr/self.num_search_range)
         delta_range = np.arange(0, self.Sr, self.Sr/self.num_search_range)
 
         DI_cost_record =[]
         for delta in delta_range:
-            record=self.cal_order_up_to(sample,self.Se,delta+self.Se,x_init,q_init,inventory_level=0,D_2_constraint=False)
-           
-            cost=record['average_total_cost']
-            DI_cost_record.append(cost)
+            record=self.cal_order_up_to(sample, self.Sr-delta, self.Sr, 
+                                        x_init, q_init,
+                                        constraint_D2=True)
+            DI_cost_record.append(record['average_total_cost'])
         min_cost_idx = np.argmin(DI_cost_record)
         optimal_delta = delta_range[min_cost_idx]
 
-
-        record_of_demand=self.cal_order_up_to(demand,self.Se,self.Se+optimal_delta,x_init,q_init,inventory_level=0,D_2_constraint=True)
+        record_of_demand=self.cal_order_up_to(demand, self.Sr-optimal_delta, self.Sr,
+                                              x_init, q_init,
+                                              constraint_D2=True)
         return record_of_demand
     
-    def benchmark_DI_policy(self,demand,sample,x_init=None,q_init=None,inventory_level=0):
+
+    def benchmark_DI_policy(self, demand, sample, x_init=None,q_init=None):
         #先找到delta的稳态分布，然后给出可能最优的组合（S,S+delta),在组合中搜索最优成本
         #先利用sample path找到稳态分布
-        x_init=self.x_init_SDI if x_init is None else x_init
+        x_init=self.x_init if x_init is None else x_init
         q_init=self.q_init if q_init is None else q_init
 
         delta_range = np.arange(0, self.Sr, self.Sr/self.num_search_range)
@@ -289,7 +167,7 @@ class dual_sourcing:
         DI_cost_record =[]
         best_Se_record=[]
         for delta in delta_range:
-            record=self.cal_order_up_to(sample,0,delta,x_init,q_init,inventory_level=0,D_2_constraint=False)
+            record=self.cal_order_up_to(sample,0,delta,x_init,q_init,constraint_D2=False)
             overshoot_record=record['overshoot_record'] 
             #计算最优的Se
             variable = sample.cumsum(axis=1)[:, self.l_e][:, None].reshape(1,-1)
@@ -297,142 +175,138 @@ class dual_sourcing:
                 variable - overshoot_record[:, -1], 
                 self.b / (self.b + self.h))
 
-            result = self.cal_order_up_to(
-                sample, best_Se, delta+best_Se, x_init, q_init,
-                inventory_level=0,D_2_constraint=False)
-            cost = result['average_total_cost']
-            DI_cost_record.append(cost)
+            result = self.cal_order_up_to(sample, best_Se, delta+best_Se, x_init, q_init, constraint_D2=False)
+            DI_cost_record.append(result['average_total_cost'])
             best_Se_record.append(best_Se)
 
         min_cost_idx = np.argmin(DI_cost_record)
         optimal_delta = delta_range[min_cost_idx]
         optimal_Se = best_Se_record[min_cost_idx]
-
-        record_of_demand=self.cal_order_up_to(demand,optimal_Se,optimal_Se+optimal_delta,x_init,q_init,inventory_level=0,D_2_constraint=True)
+        record_of_demand=self.cal_order_up_to(demand, optimal_Se, optimal_Se + optimal_delta,
+                                              x_init, q_init,
+                                              constraint_D2=True)
         return record_of_demand
-#TBS策略中加急渠道是order_up_to,常规渠道是r
-    def cal_order_up_to_with_r(self,demand,S_e,r,x_init,q_init,inventory_level=0, D_2_constraint=False):
 
+
+    # ATBS policy implementation with order-up-to level S_e and fixed regular order r
+    def cal_order_up_to_with_r(self, demand, S_e,r, x_init, q_init, constraint_D2=False):
         iter_num = demand.shape[0]
         period_length = demand.shape[1]
 
         #定义双源系统两个渠道的订货量
-        x_init=np.tile(x_init,(iter_num,1))
-        q_init=np.tile(q_init,(iter_num,1))
-        #记录两个渠道的订货量
-        order_record_regular = x_init.copy()
-        order_record_expe=q_init.copy()
+        order_record_regular=np.tile(x_init,(iter_num,1))
+        order_record_expe=np.tile(q_init,(iter_num,1))
 
         # 初始化记录数组
-        inv_level_record = np.ones((iter_num, 1)) * inventory_level
-        cost_per_period = np.zeros((iter_num, 0)) 
-        y_level_record = np.zeros((iter_num, 1))
+        inv_level_record = np.zeros((iter_num, 1))
         overshoot_record=np.zeros((iter_num, 1))
 
         for t in range(period_length):
             if order_record_expe.shape[1] < period_length:
-                # 确保索引不越界
-                end_idx = min(t + self.l_e, order_record_expe.shape[1])
                 IP_e=inv_level_record[:,[t]]+order_record_expe[:,t:t+self.l_e].sum(axis=1)[:,None]+order_record_regular[:,t:t+self.l_e+1].sum(axis=1)[:,None]
+                ###
                 order_e=np.maximum(np.ones(IP_e.shape) * S_e - IP_e, 0)
+                if constraint_D2:
+                    order_e=np.maximum(np.ones(IP_e.shape) * self.Se - IP_e, 0)
                 order_record_expe=np.hstack((order_record_expe,order_e))
                 overshoot=np.maximum(IP_e-np.ones(IP_e.shape) * S_e, 0)
                 overshoot_record=np.hstack((overshoot_record,overshoot))
-            
+
             if order_record_regular.shape[1] < period_length:
-                # 确保索引不越界
-                end_idx = min(t + self.l_r, order_record_regular.shape[1])
-                IP_r=inv_level_record[:,[t]]+order_record_expe[:,t:t+self.l_e+1].sum(axis=1)[:,None]+order_record_regular[:,t:t+self.l_r].sum(axis=1)[:,None]
-                order_r=np.ones(IP_r.shape)*r
-                order_record_regular=np.hstack((order_record_regular,order_r))
-            if D_2_constraint:
-                IP_e=inv_level_record[:,[t]]+order_record_expe[:,t:t+self.l_e+1].sum(axis=1)[:,None]+order_record_regular[:,t:t+self.l_e+1].sum(axis=1)[:,None]
-                order_e_add=np.maximum(np.ones(IP_e.shape) * self.Se - IP_e, 0)
-                order_record_expe[:, -1:] = order_record_expe[:, -1:] + order_e_add
-
-            y = inv_level_record[:, [t]] + order_record_regular[:, [t]]+order_record_expe[:,[t]]
-            d=demand[:,[t]]
-
-            # 计算当前周期的成本
-            period_cost = (
-                self.c_r * order_record_regular[:, [t]]+self.c_e * order_record_expe[:, [t]]
-                + self.h * np.maximum(y - d, 0)
-                + self.b * np.maximum(d - y, 0)
-            )
-
-            
-            # 将当前周期的成本添加到成本记录中
-            cost_per_period = np.hstack((cost_per_period, period_cost))
-
-
-            # 计算下一期的库存水平
-            next_inv_level = y - d
-
-            
-            # 使用 hstack 添加列
+                order_record_regular=np.hstack((order_record_regular,
+                                                np.ones((iter_num, 1))*r))
+                
+            next_inv_level = inv_level_record[:, [t]] + order_record_regular[:, [t]] \
+                + order_record_expe[:,[t]] - demand[:, [t]]
             inv_level_record = np.hstack((inv_level_record, next_inv_level))
-            y_level_record = np.hstack((y_level_record, y))
-
-
-        # 计算每个迭代（行）的总成本
-        total_cost_per_iteration = np.sum(cost_per_period, axis=1)
-        average_total_cost = np.mean(total_cost_per_iteration)
+        period_cost, average_total_cost = self.cal_cost(order_record_regular, order_record_expe,  inv_level_record)
 
         return {
             'order_record_r': order_record_regular,
             'order_record_e': order_record_expe,
             'inv_level_record': inv_level_record,
-            'y_level_record': y_level_record,
-            'cost_per_period': cost_per_period,
-            'total_cost_per_iteration': total_cost_per_iteration,
+            'period_cost': period_cost,
             'average_total_cost': average_total_cost,
             'overshoot_record':overshoot_record
-        }       
+        }          
 
-    def TBS_policy(self,sample,demand,mean,x_init=None,q_init=None):
-        x_init=self.x_init_SDI if x_init is None else x_init
-        q_init=self.q_init if q_init is None else q_init
-        r_range = np.linspace(0,self.Sr/self.l_r,self.num_search_range)
-        TBS_cost_record =[]
-        for r in r_range:
-            record=self.cal_order_up_to_with_r(sample,self.Se,r,x_init,q_init,inventory_level=0,D_2_constraint=True)
-            cost=record['average_total_cost']
-            TBS_cost_record.append(cost)
-        min_cost_idx = np.argmin(TBS_cost_record)
-        best_r=r_range[min_cost_idx]
-        optimal_record=self.cal_order_up_to_with_r(demand,self.Se,best_r,x_init,q_init,inventory_level=0,D_2_constraint=True)
-        return optimal_record
-    
-    def cost_driven_TBS_policy(self,sample,demand,mean,x_init=None,q_init=None):
-        x_init=self.x_init_SDI if x_init is None else x_init
-        q_init=self.q_init if q_init is None else q_init
+    def constrained_TBS_policy(self, sample, demand, x_init=None, q_init=None):
+        x_init = self.x_init if x_init is None else x_init
+        q_init = self.q_init if q_init is None else q_init
+        r_range = np.linspace(0,self.mean, self.num_search_range)
 
-        r_range = np.linspace(0,self.Sr/self.l_r,self.num_search_range)
-        TBS_cost_record =[]
-        best_Se_record=[]
+        TBS_cost_record = []      
+        best_Se_record  = []     
+
         for r in r_range:
-            record=self.cal_order_up_to_with_r(sample,self.Se,r,x_init,q_init,inventory_level=0,D_2_constraint=False)
-            overshoot_record=record['overshoot_record'] 
-            #计算最优的Se
+            #首先根据根据稳态对于给定的常规渠道订货量r搜索对应的最优SE
+            record = self.cal_order_up_to_with_r(sample, self.Se, r,
+                                                x_init, q_init,
+                                                constraint_D2=False)
+            overshoot_record = record['overshoot_record']
+            # 计算 best_Se
             variable = sample.cumsum(axis=1)[:, self.l_e][:, None].reshape(1,-1)
             best_Se = np.quantile(
                 variable - overshoot_record[:, -1], 
                 self.b / (self.b + self.h))
 
-            result = self.cal_order_up_to_with_r(
-                sample, best_Se, r, x_init, q_init,
-                inventory_level=0,D_2_constraint=False)
-            cost = result['average_total_cost']
-            TBS_cost_record.append(cost)
+            #对于参数对(r,Se)考虑服务水平
+            result = self.cal_order_up_to_with_r(sample, best_Se, r,
+                                                 x_init, q_init,
+                                                 constraint_D2=True)
+            TBS_cost_record.append(result['average_total_cost'])
             best_Se_record.append(best_Se)
 
         min_cost_idx = np.argmin(TBS_cost_record)
         optimal_r = r_range[min_cost_idx]
         optimal_Se = best_Se_record[min_cost_idx]
 
-        record_of_demand=self.cal_order_up_to_with_r(demand,optimal_Se,optimal_r,x_init,q_init,inventory_level=0,D_2_constraint=True)
-        
-        return record_of_demand
+        # 最优记录
+        optimal_record = self.cal_order_up_to_with_r(
+            demand, optimal_Se, optimal_r,
+            x_init, q_init,
+            constraint_D2=True
+        )
+        return optimal_record
+    
+    def cost_driven_TBS_policy(self, sample, demand, x_init=None, q_init=None):
+        x_init = self.x_init if x_init is None else x_init
+        q_init = self.q_init if q_init is None else q_init
+        r_range = np.linspace(0, self.mean, self.num_search_range)
+
+        TBS_cost_record = []      
+        best_Se_record  = []     
+
+        for r in r_range:
+            #首先根据根据稳态对于给定的常规渠道订货量r搜索对应的最优SE
+            record = self.cal_order_up_to_with_r(sample, self.Se, r,
+                                                x_init, q_init,
+                                                constraint_D2=False)
+            overshoot_record = record['overshoot_record']
+            # 计算 best_Se
+            variable = sample.cumsum(axis=1)[:, self.l_e][:, None].reshape(1,-1)
+            best_Se = np.quantile(
+                variable - overshoot_record[:, -1], 
+                self.b / (self.b + self.h))
+
+            #对于参数对(r,Se)考虑服务水平
+            result = self.cal_order_up_to_with_r(sample, best_Se, r,
+                                                 x_init, q_init,
+                                                 constraint_D2=False)
+            TBS_cost_record.append(result['average_total_cost'])
+            best_Se_record.append(best_Se)
+
+        min_cost_idx = np.argmin(TBS_cost_record)
+        optimal_r = r_range[min_cost_idx]
+        optimal_Se = best_Se_record[min_cost_idx]
+
+        # 最优记录
+        optimal_record = self.cal_order_up_to_with_r(
+            demand, optimal_Se, optimal_r,
+            x_init, q_init,
+            constraint_D2=True
+        )
+        return optimal_record
 
     def cal_fill_rate(self, demand, result_record_dict):
         #对于每条路径的每个节点，计算在到达时刻的总库存是否能满足需求
@@ -469,7 +343,7 @@ class dual_sourcing:
             # service_level_Se.append(np.mean(t_service_level_Se))
         
         return np.array(service_level_Se)    
-            
+
 if __name__ == "__main__":
    # 固定参数
     c_r = 0
@@ -479,120 +353,116 @@ if __name__ == "__main__":
     N_1 = 100
 
     # 参数范围
-    c_e_list = [0.5, 1, 2, 3]
-    l_r_list = [2, 3, 5, 10]
-    l_e_list = [1, 2, 3]
+    c_e_list = [1, 2]
+    lt_pairs = [(3, 1), (5, 2), (10, 3)]
     service_level_list = [0.95, 0.975, 0.99]
     # distributions = [("norm", (100, 10)), ("geom", (0.4)), ("binom", (100, 0.5))]
     distributions = [("geom", (0.4,))]
-
     results = []
 
     # 遍历所有组合
-    for dist, c_e, l_r, l_e, service_level in itertools.product(distributions, c_e_list, l_r_list, l_e_list, service_level_list):
-        if l_e >= l_r:  # 跳过不符合条件的组合
-            continue
-
-        
+    for dist, c_e, lt_pair, service_level in \
+        tqdm(itertools.product(distributions, c_e_list, lt_pairs, service_level_list)):
+        l_r, l_e = lt_pair
         b = c_e + h * (l_r + 1)
+        
         if b/(b+h)>=service_level:  # 跳过不符合条件的组合
             continue
-
-        if dist[0]=='norm':
-            mean=100
-        elif dist[0]=='geom':
-            mean=2.5
-        elif dist[0]=='binom':
-            mean=50
 
         for seed_id in range(10):  # 10个随机种子测试稳定性
             random_seed1 = np.random.randint(10000)
             random_seed2 = np.random.randint(10000)
-            print('1')
+            print(seed_id, random_seed1, random_seed2)
             demand = sample_generation(dist, (N, T), random_seed=random_seed1)
             demand[demand < 0] = 0
             sample = sample_generation(dist, (N_1, 1000), random_seed=random_seed2)
             sample[sample < 0] = 0
 
-            ds = dual_sourcing(c_r, c_e, h, b, l_r, l_e, demand, service_level)
+            ds = dual_sourcing(c_r, c_e, h, b, l_r, l_e, 90, sample, service_level)
 
             # 运行各策略
-            try:
-                sdi_result = ds.SDI_policy(demand, inventory_level=0)
-                TBS_result_fixed_se=ds.TBS_policy(sample,demand,mean,x_init=None,q_init=None)
-                di_result_fixed_se = ds.DI_policy(demand, sample, x_init=None, q_init=None, inventory_level=0)
-                benchmark_di_cost = ds.benchmark_DI_policy(demand, sample, x_init=None, q_init=None, inventory_level=0)
+            # try:
+            single_result = ds.single_source(demand)
+            print('single_result', single_result['average_total_cost'])
+            tbs_result = ds.constrained_TBS_policy(sample, demand)
+            print('tbs_result', tbs_result['average_total_cost'])
+            benckmark_tbs_result = ds.cost_driven_TBS_policy(sample, demand, x_init=None, q_init=None)
+            print('benckmark_tbs_result', benckmark_tbs_result['average_total_cost'])
+            benckmark_di_result = ds.benchmark_DI_policy(demand, sample, x_init=None, q_init=None, )
+            print('benckmark_di_result', benckmark_di_result['average_total_cost'])
+            di_result = ds.constrained_DI_policy(demand,sample,x_init=None,q_init=None,)
+            print('di_result', di_result['average_total_cost'])
 
-                # 存结果
-                results.append({
-                    "distribution": dist[0],
-                    "c_e": c_e,
-                    "l_r": l_r,
-                    "l_e": l_e,
-                    "service_level": service_level,
-                    "seed_id": seed_id,
-                    "b": b,
-                    "SDI_cost": sdi_result['average_total_cost'],
-                    "TBS_cost": TBS_result_fixed_se['average_total_cost'],
-                    "DI_cost": di_result_fixed_se['average_total_cost'],
-                    "benchmark_DI_cost": benchmark_di_cost['average_total_cost'],
-                    "random_seed1": random_seed1,
-                    "random_seed2": random_seed2,
-                })
-            except Exception as e:
-                print(f"mistake in {dist, c_e, l_r, l_e, service_level, seed_id}: {e}")
+            # 存结果
+            results.append({
+                "distribution": dist[0],
+                "c_e": c_e,
+                "l_r": l_r,
+                "l_e": l_e,
+                "service_level": service_level,
+                "seed_id": seed_id,
+                "b": b,
+                "single_cost": single_result['average_total_cost'],
+                "TBS_cost": tbs_result['average_total_cost'],
+                "benckmark_TBS_result": benckmark_tbs_result['average_total_cost'],
+                "benckmark_DI_result": benckmark_di_result['average_total_cost'],
+                "DI_result": di_result['average_total_cost'],
+                "random_seed1": random_seed1,
+                "random_seed2": random_seed2,
+            })
+            # except Exception as e:
+            #     print(f"mistake in {dist, c_e, l_r, l_e, service_level, seed_id}: {e}")
 
     # 保存结果到 CSV
     df = pd.DataFrame(results)
-    df.to_csv("result_D2.csv", index=False, encoding='utf-8-sig')
-    print("finished")                 
-            
-            
-if __name__ == "__main__":
-    # 设置参数
-    c_r = 0.5    # 常规订单成本
-    c_e = 2   # 加急订单成本
-    h = 1      # 库存持有成本
+    df.to_csv("D1_result_geom.csv", index=False, encoding='utf-8-sig')
+    print("finished")
 
-    l_r = 10 # 常规订单提前期
-    l_e = 3    # 加急订单提前期
-    b = c_e+h*(l_r+1)    # 缺货成本
-    T = 90   # 时间周期数
-    N = 500  # 模拟路径数量
-    N_1 = 100
-    service_level = 0.95  # 服务水平
+# if __name__ == "__main__":
+#     # 设置参数
+#     c_r = 0    # 常规订单成本
+#     c_e = 2   # 加急订单成本
+#     h = 1      # 库存持有成本
+
+#     l_r = 10 # 常规订单提前期
+#     l_e = 3   # 加急订单提前期
+#     b = c_e+h*(l_r+1)    # 缺货成本
+#     T = 90   # 时间周期数
+#     N = 500  # 模拟路径数量
+#     N_1 = 100
+#     service_level = 0.95  # 服务水平
     
-    # 生成需求数据 - 使用正态分布
-    distribution = ('norm', (100, 10))  # 均值为10，标准差为10的正态分布
-    mean = distribution[1][0] 
-    demand = sample_generation(distribution, (N, T), random_seed=38)
-    sample= sample_generation(distribution, (N_1, 500), random_seed=42)
+#     # 生成需求数据 - 使用正态分布
+#     distribution = ('norm', (100, 10))  # 均值为10，标准差为10的正态分布
+#     mean = distribution[1][0] 
+#     demand = sample_generation(distribution, (N, T), random_seed=38)
+#     sample= sample_generation(distribution, (N_1, 500), random_seed=42)
     
-    # 创建 dual_sourcing 实例
-    print('single_cource')
-    ds = dual_sourcing(c_r, c_e, h, b, l_r, l_e, demand, service_level)
-    lsingle_cource_result=ds.single_cource(demand)
-    print(lsingle_cource_result['average_total_cost'])
+#     # 创建 dual_sourcing 实例
+#     print('single_cource')
+#     ds = dual_sourcing(c_r, c_e, h, b, l_r, l_e, demand, service_level)
+#     lsingle_cource_result=ds.single_cource(demand)
+#     print(lsingle_cource_result['average_total_cost'])
 
 
-    # #调用TBS策略
-    # print('TBS')
-    # TBS_result=ds.TBS_policy(sample,demand,mean,x_init=None,q_init=None)
-    # print(TBS_result['average_total_cost'])
-    # # print(ds.cal_fill_rate(sample, TBS_result))
+#     # #调用TBS策略
+#     # print('TBS')
+#     # TBS_result=ds.TBS_policy(sample,demand,mean,x_init=None,q_init=None)
+#     # print(TBS_result['average_total_cost'])
+#     # # print(ds.cal_fill_rate(sample, TBS_result))
 
-    # # 调用DI策略
-    print("DI policy when se is fixed")
-    di_result = ds.DI_policy(demand, sample, x_init=None, q_init=None, inventory_level=0)
-    print(di_result['average_total_cost'])
-    # print(ds.cal_fill_rate(sample, di_cost))
+#     # # 调用DI策略
+#     print("DI policy when se is fixed")
+#     di_result = ds.DI_policy(demand, sample, x_init=None, q_init=None, inventory_level=0)
+#     print(di_result['average_total_cost'])
+#     # print(ds.cal_fill_rate(sample, di_cost))
     
-    # print('benchmark DI')
-    # benchmark_di_result = ds.benchmark_DI_policy(demand, sample, x_init=None, q_init=None, inventory_level=0)
-    # print(benchmark_di_result['average_total_cost'])
-    # # print(ds.cal_fill_rate(sample, benchmark_di_cost))
+#     # print('benchmark DI')
+#     # benchmark_di_result = ds.benchmark_DI_policy(demand, sample, x_init=None, q_init=None, inventory_level=0)
+#     # print(benchmark_di_result['average_total_cost'])
+#     # # print(ds.cal_fill_rate(sample, benchmark_di_cost))
 
-    print('cost driven TBS')
-    cost_driven_TBS_result=ds.cost_driven_TBS_policy(sample,demand,mean,x_init=None,q_init=None)
-    print(cost_driven_TBS_result['average_total_cost'])
-    # print(ds.cal_fill_rate(sample, cost_driven_TBS_result))
+#     print('cost driven TBS')
+#     cost_driven_TBS_result=ds.cost_driven_TBS_policy(sample,demand,mean,x_init=None,q_init=None)
+#     print(cost_driven_TBS_result['average_total_cost'])
+#     # print(ds.cal_fill_rate(sample, cost_driven_TBS_result))

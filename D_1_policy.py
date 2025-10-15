@@ -40,7 +40,7 @@ class dual_sourcing:
         )
 
 
-#计算S1,到S_(l_r+1)
+    #计算S1,到S_(l_r+1)
     def cum_demand_quantile(self):
         #对需求数组先向右求和，然后对每一列分别取分位数，序号为k取的是(k+1)个D的情况
         q_all = np.quantile(self.sample.cumsum(axis=1), q=self.service_level, axis=0)  
@@ -227,7 +227,6 @@ class dual_sourcing:
             DI_cost_record.append(record['average_total_cost'])
         min_cost_idx = np.argmin(DI_cost_record)
         optimal_delta = delta_range[min_cost_idx]
-        print(f"最优的delta为{optimal_delta},对应的最优Se为{self.Sr-optimal_delta}")
 
         record_of_demand=self.cal_order_up_to(demand, self.Sr-optimal_delta, self.Sr,
                                               x_init, q_init,
@@ -241,7 +240,7 @@ class dual_sourcing:
         x_init=self.x_init if x_init is None else x_init
         q_init=self.q_init if q_init is None else q_init
 
-        delta_range = np.arange(0, self.Se, self.Se/self.num_search_range)
+        delta_range = np.arange(0, self.Sr, self.Sr/self.num_search_range)
 
         DI_cost_record =[]
         best_Se_record=[]
