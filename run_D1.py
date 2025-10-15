@@ -6,6 +6,7 @@ from D_1_policy import dual_sourcing
 from demand import sample_generation
 import pickle
 import multiprocessing
+import gc
 
 # 固定参数
 c_r = 0
@@ -78,29 +79,38 @@ if __name__ == "__main__":
     os.environ["OMP_NUM_THREADS"] = "1"
     os.environ["MKL_NUM_THREADS"] = "1"
 
+    # 参数组合
     all_tasks = [
         (dist, c_e, lt_pair, service_level, seed_id)
         for dist, c_e, lt_pair, service_level in itertools.product(distributions, c_e_list, lt_pairs, service_level_list)
         for seed_id in range(10)
     ]
-    
-    # 自动选择CPU核心数量
-    max_workers = max(1, (multiprocessing.cpu_count() - 1) // 2)
-    print(f"使用 {max_workers} 个进程进行并行计算...")
 
-    results = []
-    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+    # 自动选择 CPU 核数（保留一个核心用于系统）
+    max_workers = max(1, int(multiprocessing.cpu_count())-1)
+    print(f"🧠 使用 {max_workers} 个进程并行计算...")
+
+    # 输出文件
+    output_file = "D1_result.pkl"
+    if os.path.exists(output_file):
+        os.remove(output_file)
+
+    # -----------------------------
+    # 🚀 主循环：异步执行 + 流式写入
+    # -----------------------------
+    with ProcessPoolExecutor(max_workers=9) as executor:
         futures = [executor.submit(run_simulation, args) for args in all_tasks]
         for f in tqdm(as_completed(futures), total=len(futures)):
             try:
-                results.extend(f.result())
+                res = f.result()
+                if res:
+                    # ✳️ 分批写入磁盘，防止 results 过大导致变慢
+                    with open(output_file, "ab") as fout:
+                        pickle.dump(res, fout)
             except Exception as e:
-                print(f"某个任务出错: {e}")
+                print(f"⚠️ 某个任务出错: {e}")
+            finally:
+                # 主动清理内存，防止堆积导致程序变慢
+                gc.collect()
 
-    # 保存结果
-    output_file = "D1_result.pkl"
-    with open(output_file, "wb") as f:
-        pickle.dump(results, f)
-
-    print(f"所有模拟完成，结果已保存为 {output_file}")
-    print(f"总样本数: {len(results)}")
+    print(f"\n✅ 所有模拟完成，结果已分批保存为 {output_file}")

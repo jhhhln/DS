@@ -13,5 +13,7 @@
   "codegraphy.selectedD3Color": "Spectral",
   "codegraphy.selectedNodeColor": "#fff",
   "codegraphy.favoriteNodeColor": "#ffd700",
-  "codegraphy.outlineColor": "#ffd700"
+  "codegraphy.outlineColor": "#ffd700",
+  "python-envs.defaultEnvManager": "ms-python.python:system",
+  "python-envs.pythonProjects": []
 }
