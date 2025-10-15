@@ -63,17 +63,19 @@ class dual_sourcing:
         S_r = self.Se + (self.l_r - self.l_e) * self.mean
     
         for t in range(period_length):
-            IP_r = inv_level_record[:,[t]] + order_record_regular[:,t:t+self.l_r].sum(axis=1)[:,None]
-            order_r = np.maximum(np.ones(IP_r.shape) * S_r - IP_r, 0)
-            order_record_regular = np.hstack((order_record_regular,order_r))
+            if order_record_regular.shape[1] < period_length:
+                IP_r = inv_level_record[:,[t]] + order_record_regular[:,t:t+self.l_r].sum(axis=1)[:,None]
+                order_r = np.maximum(np.ones(IP_r.shape) * S_r - IP_r, 0)
+                order_record_regular = np.hstack((order_record_regular,order_r))
+            
+            if order_record_expe.shape[1] < period_length:
+                IP_e = inv_level_record[:,[t]] \
+                    + order_record_regular[:,t : t+self.l_e+1].sum(axis=1)[:,None] \
+                    + order_record_expe[:,t : t+self.l_e].sum(axis=1)[:,None]
+                order_e = np.maximum(np.ones(IP_e.shape) * self.Se - IP_e, 0)
+                order_record_expe = np.hstack((order_record_expe, order_e))
 
-            IP_e = inv_level_record[:,[t]] \
-                + order_record_regular[:,t : t+self.l_e+1].sum(axis=1)[:,None] \
-                + order_record_expe[:,t : t+self.l_e].sum(axis=1)[:,None]
-            order_e = np.maximum(np.ones(IP_e.shape) * self.Se - IP_e, 0)
-            order_record_expe = np.hstack((order_record_expe, order_e))
-
-            next_inv_level = inv_level_record[:, [t]] + order_record_regular[:, [t]] - demand[:, [t]]
+            next_inv_level = inv_level_record[:, [t]] + order_record_regular[:, [t]] + order_record_expe[:, [t]] - demand[:, [t]]
             inv_level_record = np.hstack((inv_level_record, next_inv_level))
         period_cost, average_total_cost = self.cal_cost(order_r, np.zeros((iter_num, period_length)),  inv_level_record)
 
@@ -345,124 +347,50 @@ class dual_sourcing:
         return np.array(service_level_Se)    
 
 if __name__ == "__main__":
-   # 固定参数
-    c_r = 0
-    h = 1
-    T = 90
-    N = 1000
+    # 设置参数
+    c_r = 0    # 常规订单成本
+    c_e = 2   # 加急订单成本
+    h = 1      # 库存持有成本
+
+    l_r = 10 # 常规订单提前期
+    l_e = 3   # 加急订单提前期
+    b = c_e+h*(l_r+1)    # 缺货成本
+    T = 90   # 时间周期数
+    N = 500  # 模拟路径数量
     N_1 = 100
-
-    # 参数范围
-    c_e_list = [1, 2]
-    lt_pairs = [(3, 1), (5, 2), (10, 3)]
-    service_level_list = [0.95, 0.975, 0.99]
-    # distributions = [("norm", (100, 10)), ("geom", (0.4)), ("binom", (100, 0.5))]
-    distributions = [("geom", (0.4,))]
-    results = []
-
-    # 遍历所有组合
-    for dist, c_e, lt_pair, service_level in \
-        tqdm(itertools.product(distributions, c_e_list, lt_pairs, service_level_list)):
-        l_r, l_e = lt_pair
-        b = c_e + h * (l_r + 1)
-        
-        if b/(b+h)>=service_level:  # 跳过不符合条件的组合
-            continue
-
-        for seed_id in range(10):  # 10个随机种子测试稳定性
-            random_seed1 = np.random.randint(10000)
-            random_seed2 = np.random.randint(10000)
-            print(seed_id, random_seed1, random_seed2)
-            demand = sample_generation(dist, (N, T), random_seed=random_seed1)
-            demand[demand < 0] = 0
-            sample = sample_generation(dist, (N_1, 1000), random_seed=random_seed2)
-            sample[sample < 0] = 0
-
-            ds = dual_sourcing(c_r, c_e, h, b, l_r, l_e, 90, sample, service_level)
-
-            # 运行各策略
-            # try:
-            single_result = ds.single_source(demand)
-            print('single_result', single_result['average_total_cost'])
-            tbs_result = ds.constrained_TBS_policy(sample, demand)
-            print('tbs_result', tbs_result['average_total_cost'])
-            benckmark_tbs_result = ds.cost_driven_TBS_policy(sample, demand, x_init=None, q_init=None)
-            print('benckmark_tbs_result', benckmark_tbs_result['average_total_cost'])
-            benckmark_di_result = ds.benchmark_DI_policy(demand, sample, x_init=None, q_init=None, )
-            print('benckmark_di_result', benckmark_di_result['average_total_cost'])
-            di_result = ds.constrained_DI_policy(demand,sample,x_init=None,q_init=None,)
-            print('di_result', di_result['average_total_cost'])
-
-            # 存结果
-            results.append({
-                "distribution": dist[0],
-                "c_e": c_e,
-                "l_r": l_r,
-                "l_e": l_e,
-                "service_level": service_level,
-                "seed_id": seed_id,
-                "b": b,
-                "single_cost": single_result['average_total_cost'],
-                "TBS_cost": tbs_result['average_total_cost'],
-                "benckmark_TBS_result": benckmark_tbs_result['average_total_cost'],
-                "benckmark_DI_result": benckmark_di_result['average_total_cost'],
-                "DI_result": di_result['average_total_cost'],
-                "random_seed1": random_seed1,
-                "random_seed2": random_seed2,
-            })
-            # except Exception as e:
-            #     print(f"mistake in {dist, c_e, l_r, l_e, service_level, seed_id}: {e}")
-
-    # 保存结果到 CSV
-    df = pd.DataFrame(results)
-    df.to_csv("D1_result_geom.csv", index=False, encoding='utf-8-sig')
-    print("finished")
-
-# if __name__ == "__main__":
-#     # 设置参数
-#     c_r = 0    # 常规订单成本
-#     c_e = 2   # 加急订单成本
-#     h = 1      # 库存持有成本
-
-#     l_r = 10 # 常规订单提前期
-#     l_e = 3   # 加急订单提前期
-#     b = c_e+h*(l_r+1)    # 缺货成本
-#     T = 90   # 时间周期数
-#     N = 500  # 模拟路径数量
-#     N_1 = 100
-#     service_level = 0.95  # 服务水平
+    service_level = 0.95  # 服务水平
     
-#     # 生成需求数据 - 使用正态分布
-#     distribution = ('norm', (100, 10))  # 均值为10，标准差为10的正态分布
-#     mean = distribution[1][0] 
-#     demand = sample_generation(distribution, (N, T), random_seed=38)
-#     sample= sample_generation(distribution, (N_1, 500), random_seed=42)
+    # 生成需求数据 - 使用正态分布
+    distribution = ('norm', (100, 10))  # 均值为10，标准差为10的正态分布
+    mean = distribution[1][0] 
+    demand = sample_generation(distribution, (N, T))
+    sample= sample_generation(distribution, (N_1, 500))
+    sample2= sample_generation(distribution, (1000, 500))
     
-#     # 创建 dual_sourcing 实例
-#     print('single_cource')
-#     ds = dual_sourcing(c_r, c_e, h, b, l_r, l_e, demand, service_level)
-#     lsingle_cource_result=ds.single_cource(demand)
-#     print(lsingle_cource_result['average_total_cost'])
+    # 创建 dual_sourcing 实例
+    print('single_cource')
+    ds = dual_sourcing(c_r, c_e, h, b, l_r, l_e, T, sample, service_level)
+    single_source_result=ds.single_source(demand)
+    print(single_source_result['average_total_cost'])
+    print(ds.cal_fill_rate(sample2, single_source_result))
 
 
-#     # #调用TBS策略
-#     # print('TBS')
-#     # TBS_result=ds.TBS_policy(sample,demand,mean,x_init=None,q_init=None)
-#     # print(TBS_result['average_total_cost'])
-#     # # print(ds.cal_fill_rate(sample, TBS_result))
-
-#     # # 调用DI策略
-#     print("DI policy when se is fixed")
-#     di_result = ds.DI_policy(demand, sample, x_init=None, q_init=None, inventory_level=0)
-#     print(di_result['average_total_cost'])
-#     # print(ds.cal_fill_rate(sample, di_cost))
+    # #调用TBS策略
+    # print('TBS')
+    # TBS_result=ds.TBS_policy(sample,demand)
+    # print(TBS_result['average_total_cost'])
+    # # print(ds.cal_fill_rate(sample, TBS_result))
     
-#     # print('benchmark DI')
-#     # benchmark_di_result = ds.benchmark_DI_policy(demand, sample, x_init=None, q_init=None, inventory_level=0)
-#     # print(benchmark_di_result['average_total_cost'])
-#     # # print(ds.cal_fill_rate(sample, benchmark_di_cost))
+    # print('benchmark DI')
+    # benchmark_di_result = ds.benchmark_DI_policy(demand, sample)
+    # print(benchmark_di_result['average_total_cost'])
+    # # print(ds.cal_fill_rate(sample, benchmark_di_cost))
 
-#     print('cost driven TBS')
-#     cost_driven_TBS_result=ds.cost_driven_TBS_policy(sample,demand,mean,x_init=None,q_init=None)
-#     print(cost_driven_TBS_result['average_total_cost'])
-#     # print(ds.cal_fill_rate(sample, cost_driven_TBS_result))
+    print('cost driven TBS')
+    cost_driven_TBS_result=ds.cost_driven_TBS_policy(sample,demand)
+    print(cost_driven_TBS_result['average_total_cost'])
+    print(ds.cal_fill_rate(sample2, cost_driven_TBS_result))
+    print(1)
+
+    aa = single_source_result['order_record_r'][:,:90].cumsum(axis=1) + single_source_result['order_record_e'][:,:90].cumsum(axis=1)
+    bb = cost_driven_TBS_result['order_record_r'].cumsum(axis=1) + cost_driven_TBS_result['order_record_e'].cumsum(axis=1)
