@@ -73,7 +73,7 @@ class dual_sourcing:
                 if order_record_regular.shape[1] < period_length:
                     IP_r = inv_level_record[:,[t]] + order_record_regular[:,t:t+self.l_r].sum(axis=1)[:,None]
                     order_r = np.maximum(np.ones(IP_r.shape) * S_r - IP_r, 0)
-                    order_r = np.minimum(order_r - order_e, self.mean)
+                    order_r = np.minimum(order_r - order_e, 0)
                     order_record_regular = np.hstack((order_record_regular,order_r))
 
             next_inv_level = inv_level_record[:, [t]] + order_record_regular[:, [t]] + order_record_expe[:, [t]] - demand[:, [t]]
@@ -338,9 +338,8 @@ class dual_sourcing:
                 current_inventory_level=inv_level_record[:, t][:,None]
                 inventory_final=current_inventory_level+current_pipeline_r+current_pipeline_e-current_future_demand_path.sum()
                 #计算inventory_final大于0的比例
-                t_service_level_Se.append((inventory_final> 0).mean())
+                t_service_level_Se.append((inventory_final> -0.01).mean())
                 
-            
             # 对当前时间点t的所有样本路径求平均
             service_level_Se.append(np.mean(t_service_level_Se))
             # service_level_Se.append(np.mean(t_service_level_Se))
@@ -353,13 +352,13 @@ if __name__ == "__main__":
     c_e = 2   # 加急订单成本
     h = 1      # 库存持有成本
 
-    l_r = 3 # 常规订单提前期
-    l_e = 1   # 加急订单提前期
+    l_r = 10 # 常规订单提前期
+    l_e = 3   # 加急订单提前期
     b = c_e+h*(l_r+1)    # 缺货成本
     T = 90   # 时间周期数
     N = 500  # 模拟路径数量
-    N_1 = 100
-    service_level = 0.95  # 服务水平
+    N_1 = 1000
+    service_level = 0.99  # 服务水平
     
     # 生成需求数据 - 使用正态分布
     distribution = ('norm', (100, 10))  # 均值为10，标准差为10的正态分布
@@ -370,22 +369,22 @@ if __name__ == "__main__":
     
     # 创建 dual_sourcing 实例
     print('single_cource')
-    ds = dual_sourcing(c_r, c_e, h, b, l_r, l_e, T, sample, service_level)
+    ds = dual_sourcing(c_r, c_e, h, b, l_r, l_e, T, sample2, service_level)
     single_source_result=ds.single_source(demand)
     print(single_source_result['average_total_cost'])
     print(ds.cal_fill_rate(sample2, single_source_result))
 
 
-    # #调用TBS策略
-    # print('TBS')
-    # TBS_result=ds.TBS_policy(sample,demand)
-    # print(TBS_result['average_total_cost'])
-    # # print(ds.cal_fill_rate(sample, TBS_result))
+    #调用TBS策略
+    print('TBS')
+    TBS_result=ds.constrained_TBS_policy(sample,demand)
+    print(TBS_result['average_total_cost'])
+    print(ds.cal_fill_rate(sample2, TBS_result))
     
-    # print('benchmark DI')
-    # benchmark_di_result = ds.benchmark_DI_policy(demand, sample)
-    # print(benchmark_di_result['average_total_cost'])
-    # # print(ds.cal_fill_rate(sample, benchmark_di_cost))
+    print('benchmark DI')
+    benchmark_di_result = ds.benchmark_DI_policy(demand, sample)
+    print(benchmark_di_result['average_total_cost'])
+    print(ds.cal_fill_rate(sample2, benchmark_di_result))
 
     print('cost driven TBS')
     cost_driven_TBS_result=ds.cost_driven_TBS_policy(sample,demand)
@@ -393,6 +392,11 @@ if __name__ == "__main__":
     print(ds.cal_fill_rate(sample2, cost_driven_TBS_result))
     print(1)
 
-    aa = single_source_result['order_record_r'][:,:90].cumsum(axis=1) + single_source_result['order_record_e'][:,:90].cumsum(axis=1)
-    bb = cost_driven_TBS_result['order_record_r'].cumsum(axis=1) + cost_driven_TBS_result['order_record_e'].cumsum(axis=1)
-    np.maximum(single_source_result['inv_level_record'], 0).sum(axis=1).mean() - np.maximum(cost_driven_TBS_result['inv_level_record'], 0).sum(axis=1).mean()
+    # aa = single_source_result['order_record_r'][:,:90].cumsum(axis=1) + single_source_result['order_record_e'][:,:90].cumsum(axis=1)
+    # bb = cost_driven_TBS_result['order_record_r'].cumsum(axis=1) + cost_driven_TBS_result['order_record_e'].cumsum(axis=1)
+    # np.maximum(single_source_result['inv_level_record'], 0).sum(axis=1).mean() - np.maximum(cost_driven_TBS_result['inv_level_record'], 0).sum(axis=1).mean()
+    for t in range(single_source_result['inv_level_record'].shape[1] - l_e-1):
+        IP_e = single_source_result['inv_level_record'][:,[t]] + single_source_result['order_record_e'][:,t:t+l_e+1].sum(axis=1)[:,None] \
+                    + single_source_result['order_record_r'][:,t:t+l_e+1].sum(axis=1)[:,None]
+        if (IP_e < ds.Se - 0.001).any():
+            print(t, np.where(IP_e < ds.Se)[0])
