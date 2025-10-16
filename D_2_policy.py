@@ -63,17 +63,18 @@ class dual_sourcing:
         S_r = self.Se + (self.l_r - self.l_e) * self.mean
     
         for t in range(period_length):
-            if order_record_regular.shape[1] < period_length:
-                IP_r = inv_level_record[:,[t]] + order_record_regular[:,t:t+self.l_r].sum(axis=1)[:,None]
-                order_r = np.maximum(np.ones(IP_r.shape) * S_r - IP_r, 0)
-                order_record_regular = np.hstack((order_record_regular,order_r))
-            
             if order_record_expe.shape[1] < period_length:
                 IP_e = inv_level_record[:,[t]] \
                     + order_record_regular[:,t : t+self.l_e+1].sum(axis=1)[:,None] \
                     + order_record_expe[:,t : t+self.l_e].sum(axis=1)[:,None]
                 order_e = np.maximum(np.ones(IP_e.shape) * self.Se - IP_e, 0)
                 order_record_expe = np.hstack((order_record_expe, order_e))
+
+                if order_record_regular.shape[1] < period_length:
+                    IP_r = inv_level_record[:,[t]] + order_record_regular[:,t:t+self.l_r].sum(axis=1)[:,None]
+                    order_r = np.maximum(np.ones(IP_r.shape) * S_r - IP_r, 0)
+                    order_r = np.minimum(order_r - order_e, self.mean)
+                    order_record_regular = np.hstack((order_record_regular,order_r))
 
             next_inv_level = inv_level_record[:, [t]] + order_record_regular[:, [t]] + order_record_expe[:, [t]] - demand[:, [t]]
             inv_level_record = np.hstack((inv_level_record, next_inv_level))
@@ -352,8 +353,8 @@ if __name__ == "__main__":
     c_e = 2   # 加急订单成本
     h = 1      # 库存持有成本
 
-    l_r = 10 # 常规订单提前期
-    l_e = 3   # 加急订单提前期
+    l_r = 3 # 常规订单提前期
+    l_e = 1   # 加急订单提前期
     b = c_e+h*(l_r+1)    # 缺货成本
     T = 90   # 时间周期数
     N = 500  # 模拟路径数量
@@ -394,3 +395,4 @@ if __name__ == "__main__":
 
     aa = single_source_result['order_record_r'][:,:90].cumsum(axis=1) + single_source_result['order_record_e'][:,:90].cumsum(axis=1)
     bb = cost_driven_TBS_result['order_record_r'].cumsum(axis=1) + cost_driven_TBS_result['order_record_e'].cumsum(axis=1)
+    np.maximum(single_source_result['inv_level_record'], 0).sum(axis=1).mean() - np.maximum(cost_driven_TBS_result['inv_level_record'], 0).sum(axis=1).mean()
