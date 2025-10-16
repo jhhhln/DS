@@ -17,7 +17,7 @@ N_1 = 100
 
 # 参数范围
 c_e_list = [1, 2]
-lt_pairs = [(3, 1), (5, 2), (10, 3)]
+lt_pairs = [(2,1), (3, 1), (5, 2), (8,3), (10, 3)]
 service_level_list = [0.95, 0.975, 0.99]
 distributions = [("norm", (100, 10)), ("geom", (0.4,)), ("binom", (100, 0.5))]
 # distributions = [("geom", (0.4,))]
@@ -85,18 +85,19 @@ if __name__ == "__main__":
     ]
 
     # 自动选择 CPU 核数（保留一个核心用于系统）
-    max_workers = max(1, int(multiprocessing.cpu_count()/2)-1)
+    # max_workers = max(1, int(multiprocessing.cpu_count())-1)
+    max_workers = 8
     print(f"🧠 使用 {max_workers} 个进程并行计算...")
 
     # 输出文件
-    output_file = "D2_result.pkl"
+    output_file = "./result/D2_result_full_lt_pair.pkl"
     if os.path.exists(output_file):
         os.remove(output_file)
 
     # -----------------------------
     # 🚀 主循环：异步执行 + 流式写入
     # -----------------------------
-    with ProcessPoolExecutor(max_workers=9) as executor:
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
         futures = [executor.submit(run_simulation, args) for args in all_tasks]
         for f in tqdm(as_completed(futures), total=len(futures)):
             try:
