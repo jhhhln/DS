@@ -76,7 +76,7 @@ if __name__ == "__main__":
     import os
     os.environ["OMP_NUM_THREADS"] = "1"
     os.environ["MKL_NUM_THREADS"] = "1"
-
+    
     # 参数组合
     all_tasks = [
         (dist, c_e, lt_pair, service_level, seed_id)
@@ -90,7 +90,7 @@ if __name__ == "__main__":
     print(f"🧠 使用 {max_workers} 个进程并行计算...")
 
     # 输出文件
-    output_file = "./result/D2_result_full_lt_pair.pkl"
+    output_file = "./result/D2_result.pkl"
     if os.path.exists(output_file):
         os.remove(output_file)
 

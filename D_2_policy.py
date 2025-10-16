@@ -146,14 +146,14 @@ class dual_sourcing:
 
         DI_cost_record =[]
         for delta in delta_range:
-            record=self.cal_order_up_to(sample, self.Sr-delta, self.Sr, 
+            record=self.cal_order_up_to(sample, self.Se, self.Se+delta, 
                                         x_init, q_init,
                                         constraint_D2=True)
             DI_cost_record.append(record['average_total_cost'])
         min_cost_idx = np.argmin(DI_cost_record)
         optimal_delta = delta_range[min_cost_idx]
 
-        record_of_demand=self.cal_order_up_to(demand, self.Sr-optimal_delta, self.Sr,
+        record_of_demand=self.cal_order_up_to(demand, self.Se, self.Se+delta,
                                               x_init, q_init,
                                               constraint_D2=True)
         return record_of_demand
